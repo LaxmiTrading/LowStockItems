@@ -117,7 +117,9 @@ export default function AppShell() {
 					</span>
 				)}
 
-				{user?.role === 'administrator' && (
+				{/* Everyone: appearance and your own password live here. The
+				    administrator-only cards inside are gated separately. */}
+				{user && (
 					<NavLink
 						to="/settings"
 						className={`flex items-center h-8 px-3 rounded border text-[12.5px] font-bold no-underline hover:no-underline ${

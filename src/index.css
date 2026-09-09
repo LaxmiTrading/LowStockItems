@@ -4,6 +4,180 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme ────────────────────────────────────────────────────────────────
+   Every Tailwind colour resolves to one of these variables, so switching
+   theme is a change of values rather than a second set of classes on ~1000
+   elements.
+
+   `data-theme` is always written explicitly by the app — "system" is resolved
+   in JavaScript rather than with a prefers-color-scheme media query. That
+   keeps one source of truth (a media query would fight an explicit choice at
+   equal specificity), and an inline script in index.html sets the attribute
+   before first paint so there is no flash of the wrong theme.
+
+   `color-scheme` is what makes native form controls, scrollbars and the
+   browser's own canvas follow along. */
+:root {
+	color-scheme: light;
+	--c-app: 238 241 245;
+	--c-surface: 255 255 255;
+	--c-surface-2: 246 247 249;
+	--c-surface-3: 251 252 253;
+	--c-surface-4: 244 245 247;
+	--c-sidebar: 250 251 252;
+	--c-line: 230 232 235;
+	--c-line-2: 215 219 224;
+	--c-line-3: 236 238 241;
+	--c-line-4: 241 242 244;
+	--c-heading: 35 40 48;
+	--c-body: 51 58 69;
+	--c-body-2: 74 80 87;
+	--c-body-3: 91 98 112;
+	--c-muted: 139 145 154;
+	--c-muted-2: 154 160 168;
+	--c-muted-3: 167 173 181;
+	--c-muted-4: 207 212 218;
+	--c-brand: 64 141 251;
+	--c-link: 47 123 224;
+	--c-link-hover: 31 106 208;
+	--c-brand-bg: 234 242 255;
+	--c-brand-border: 207 224 251;
+	--c-brand-50: 242 247 255;
+	--c-brand-100: 226 237 255;
+	--c-brand-200: 199 220 254;
+	--c-brand-300: 156 195 253;
+	--c-brand-400: 107 166 252;
+	--c-brand-500: 64 141 251;
+	--c-brand-600: 47 123 224;
+	--c-brand-700: 34 99 187;
+	--c-brand-800: 27 78 148;
+	--c-brand-900: 23 63 118;
+	--c-ok: 26 157 84;
+	--c-ok-bg: 233 247 239;
+	--c-ok-border: 191 229 207;
+	--c-warn: 199 119 0;
+	--c-warn-2: 176 106 0;
+	--c-warn-bg: 253 242 220;
+	--c-warn-border: 242 215 154;
+	--c-danger: 224 50 43;
+	--c-danger-bg: 253 236 235;
+	--c-danger-border: 243 210 210;
+	--c-row-selected: 244 249 255;
+
+	/* Chrome and effects that sit outside the palette. */
+	--c-shadow: 28 42 70;        /* shadows are tinted with the page's blue-grey */
+	--c-overlay: 20 30 50;       /* modal backdrops */
+	--c-skeleton: 238 240 243;
+	--c-shimmer: 255 255 255;
+	--c-row-hover: 245 248 252;
+	--c-scroll-thumb: 207 212 218;
+	--c-scroll-thumb-hover: 180 187 196;
+	--c-focus-ring: 196 201 208;
+
+	/* Group and customer avatars. Sampled from the brand's neighbourhood
+	   rather than the full wheel, so a list of them does not turn into a
+	   rainbow fighting the one blue this app is built on. */
+	--c-tint-1-bg: 226 237 255; --c-tint-1-fg: 34 99 187;
+	--c-tint-2-bg: 230 240 248; --c-tint-2-fg: 31 96 136;
+	--c-tint-3-bg: 233 236 247; --c-tint-3-fg: 65 76 138;
+	--c-tint-4-bg: 228 241 238; --c-tint-4-fg: 29 107 92;
+	--c-tint-5-bg: 240 236 248; --c-tint-5-fg: 90 74 140;
+	--c-tint-6-bg: 232 241 230; --c-tint-6-fg: 63 107 52;
+
+	/* Shadows are tinted with the page's blue-grey rather than pure black, so a
+	   lifted surface reads as sitting on this background. */
+	--shadow-card: 0 1px 2px rgb(var(--c-shadow) / 0.04), 0 1px 3px rgb(var(--c-shadow) / 0.06);
+	--shadow-card-hover: 0 2px 4px rgb(var(--c-shadow) / 0.05), 0 8px 20px rgb(var(--c-shadow) / 0.09);
+	--shadow-pop: 0 4px 10px rgb(var(--c-shadow) / 0.08), 0 14px 34px rgb(var(--c-shadow) / 0.14);
+	--shadow-float: 0 10px 20px rgb(var(--c-shadow) / 0.10), 0 24px 60px rgb(var(--c-shadow) / 0.18);
+	--shadow-inner-line: inset 0 -1px 0 rgb(var(--c-line-3));
+
+	/* The undo toast is a card that floats above everything. On a light page it
+	   is dark for contrast; on a dark one it has to go lighter instead, or it
+	   disappears into the background it is meant to sit on top of. */
+	--c-toast-bg: 35 40 48;
+	--c-toast-fg: 255 255 255;
+	--c-toast-muted: 138 147 160;
+	--c-toast-border: 58 66 76;
+}
+
+:root[data-theme='dark'] {
+	color-scheme: dark;
+	--c-app: 20 23 28;
+	--c-surface: 27 31 38;
+	--c-surface-2: 34 39 47;
+	--c-surface-3: 30 35 42;
+	--c-surface-4: 25 29 35;
+	--c-sidebar: 23 27 33;
+	--c-line: 43 49 58;
+	--c-line-2: 57 65 76;
+	--c-line-3: 38 44 52;
+	--c-line-4: 34 40 49;
+	--c-heading: 232 234 238;
+	--c-body: 211 216 223;
+	--c-body-2: 185 192 201;
+	--c-body-3: 154 162 173;
+	--c-muted: 125 133 144;
+	--c-muted-2: 110 118 129;
+	--c-muted-3: 99 107 117;
+	--c-muted-4: 74 82 92;
+	--c-brand: 77 148 251;
+	--c-link: 106 168 253;
+	--c-link-hover: 141 189 254;
+	--c-brand-bg: 22 35 58;
+	--c-brand-border: 43 69 112;
+	--c-brand-50: 20 29 43;
+	--c-brand-100: 23 39 63;
+	--c-brand-200: 30 58 95;
+	--c-brand-300: 43 84 136;
+	--c-brand-400: 58 114 184;
+	--c-brand-500: 77 148 251;
+	--c-brand-600: 106 168 253;
+	--c-brand-700: 141 189 254;
+	--c-brand-800: 179 211 254;
+	--c-brand-900: 214 232 255;
+	--c-ok: 53 192 122;
+	--c-ok-bg: 18 41 29;
+	--c-ok-border: 30 77 51;
+	--c-warn: 224 160 32;
+	--c-warn-2: 240 181 68;
+	--c-warn-bg: 42 33 19;
+	--c-warn-border: 87 67 28;
+	--c-danger: 242 99 92;
+	--c-danger-bg: 44 23 25;
+	--c-danger-border: 92 44 46;
+	--c-row-selected: 26 37 54;
+
+	--c-shadow: 0 0 0;
+	--c-overlay: 0 0 0;
+	--c-skeleton: 34 40 48;
+	--c-shimmer: 255 255 255;
+	--c-row-hover: 30 36 45;
+	--c-scroll-thumb: 60 68 78;
+	--c-scroll-thumb-hover: 82 92 104;
+	--c-focus-ring: 90 100 112;
+
+	--c-tint-1-bg: 23 39 63;  --c-tint-1-fg: 141 189 254;
+	--c-tint-2-bg: 20 38 50;  --c-tint-2-fg: 125 186 220;
+	--c-tint-3-bg: 30 34 56;  --c-tint-3-fg: 154 165 226;
+	--c-tint-4-bg: 18 42 38;  --c-tint-4-fg: 118 201 184;
+	--c-tint-5-bg: 36 30 52;  --c-tint-5-fg: 184 165 230;
+	--c-tint-6-bg: 24 40 22;  --c-tint-6-fg: 150 199 137;
+
+	/* Darker and deeper: on a dark ground a shadow has to work harder, and
+	   black rather than blue-grey is what reads as depth. */
+	--shadow-card: 0 1px 2px rgb(var(--c-shadow) / 0.35), 0 1px 3px rgb(var(--c-shadow) / 0.45);
+	--shadow-card-hover: 0 2px 4px rgb(var(--c-shadow) / 0.40), 0 8px 20px rgb(var(--c-shadow) / 0.55);
+	--shadow-pop: 0 4px 10px rgb(var(--c-shadow) / 0.45), 0 14px 34px rgb(var(--c-shadow) / 0.60);
+	--shadow-float: 0 10px 20px rgb(var(--c-shadow) / 0.50), 0 24px 60px rgb(var(--c-shadow) / 0.70);
+	--shadow-inner-line: inset 0 -1px 0 rgb(var(--c-line-3));
+
+	--c-toast-bg: 47 54 64;
+	--c-toast-fg: 240 242 245;
+	--c-toast-muted: 154 162 173;
+	--c-toast-border: 74 84 96;
+}
+
 /* Base styles mirror the Claude Design canvas (docs/design/LowStockItems.dc.html). */
 
 * {
@@ -18,20 +192,20 @@ body {
 body {
 	font-family: 'Lato', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
 		sans-serif;
-	color: #333a45;
-	/* One flat grey. Cards separate from it by their border, not by a wash. */
-	background: #eef1f5;
+	color: rgb(var(--c-body));
+	/* One flat ground. Cards separate from it by their border, not by a wash. */
+	background: rgb(var(--c-app));
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 }
 
 a {
-	color: #2f7be0;
+	color: rgb(var(--c-link));
 	text-decoration: none;
 }
 
 a:hover {
-	color: #1f6ad0;
+	color: rgb(var(--c-link-hover));
 	text-decoration: underline;
 }
 
@@ -42,14 +216,14 @@ select {
 }
 
 input::placeholder {
-	color: #a7adb5;
+	color: rgb(var(--c-muted-3));
 }
 
 /* A hairline focus ring for things you operate — buttons, links, the custom
    checkbox. A real `outline` rather than a spread box-shadow, so it follows
    each element's own border-radius and never reads as a halo. */
 :focus-visible {
-	outline: 1px solid #c4c9d0;
+	outline: 1px solid rgb(var(--c-focus-ring));
 	outline-offset: 1px;
 }
 
@@ -123,7 +297,7 @@ input[type='number'] {
 .skeleton {
 	position: relative;
 	overflow: hidden;
-	background: #eef0f3;
+	background: rgb(var(--c-skeleton));
 	border-radius: 3px;
 }
 
@@ -135,7 +309,7 @@ input[type='number'] {
 	background: linear-gradient(
 		90deg,
 		transparent,
-		rgba(255, 255, 255, 0.85),
+		rgb(var(--c-shimmer) / 0.55),
 		transparent
 	);
 	animation: shimmer 1.6s infinite;
@@ -277,14 +451,14 @@ code {
 }
 
 ::-webkit-scrollbar-thumb {
-	background: #cfd4da;
+	background: rgb(var(--c-scroll-thumb));
 	border-radius: 6px;
 	border: 2px solid transparent;
 	background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: #b4bbc4;
+	background: rgb(var(--c-scroll-thumb-hover));
 	background-clip: content-box;
 }
 

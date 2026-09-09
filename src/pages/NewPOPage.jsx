@@ -13,7 +13,6 @@ import BulkAddItemsModal from '../components/po/BulkAddItemsModal';
 import VendorPicker from '../components/po/VendorPicker';
 import ContactDetails from '../components/ContactDetails';
 import Toggle from '../components/po/Toggle';
-import { invalidate as invalidateLowStock } from '../lib/lowStockRun';
 
 const money = (v) =>
 	'₹' +
@@ -339,10 +338,13 @@ export default function NewPOPage() {
 				roundOff,
 				adjustment: Number(adjustment) || 0,
 			});
-			// The items just ordered now sit on an open PO, so they should drop off
-			// the low-stock list. The cached load has to be dropped for that to
-			// show — otherwise the list would come back stale.
-			invalidateLowStock();
+			// The low-stock list is deliberately NOT invalidated here. The items
+			// just ordered do now sit on an open PO and would drop off a fresh
+			// load, but re-fetching the whole catalogue costs a long wait on
+			// return — and the usual reason to come back is to raise another
+			// order, often from the same vendor's rows. Those rows staying put is
+			// worth more than the list being immediately exact. Reload the page
+			// to pull a fresh one.
 
 			// Close the page and report back on the list. `replace` keeps the spent
 			// form out of the history, so Back does not return to it.

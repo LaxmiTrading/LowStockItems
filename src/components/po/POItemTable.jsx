@@ -312,7 +312,7 @@ function POLineRow({
 
 function PlusCircle() {
 	return (
-		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2f7be0" strokeWidth="2">
+		<svg className="text-brand-600" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
 			<circle cx="12" cy="12" r="9" />
 			<path d="M12 8v8M8 12h8" strokeLinecap="round" />
 		</svg>

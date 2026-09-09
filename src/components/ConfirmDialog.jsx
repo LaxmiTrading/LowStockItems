@@ -43,7 +43,7 @@ export default function ConfirmDialog({
 	return (
 		<div
 			className="fixed inset-0 z-[95] flex items-center justify-center p-6 animate-fade-in"
-			style={{ background: 'rgba(20,30,50,.42)' }}
+			style={{ background: 'rgb(var(--c-overlay) / 0.42)' }}
 			onClick={(e) => {
 				if (e.target === e.currentTarget && !busy) onCancel();
 			}}>
@@ -55,7 +55,7 @@ export default function ConfirmDialog({
 				<div className="px-5 pt-5 pb-4">
 					<div className="flex items-start gap-3">
 						<span className="w-10 h-10 rounded bg-danger-bg border border-danger-border flex items-center justify-center flex-shrink-0">
-							<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#e0322b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+							<svg className="text-danger" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
 								<path d="M12 9v4M12 17h.01" />
 								<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
 							</svg>

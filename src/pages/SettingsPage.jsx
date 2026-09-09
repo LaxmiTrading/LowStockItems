@@ -9,6 +9,7 @@ import {
 	zohoStatus,
 } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { THEME_OPTIONS, useTheme } from '../lib/theme';
 
 const field =
 	'w-full h-9 border border-line-2 rounded px-3 text-[13.5px] bg-surface text-body outline-none transition-colors focus:border-muted-3';
@@ -50,6 +51,66 @@ function Notice({ tone = 'ok', children }) {
  * connection exists and where it came from; the token itself is not returned
  * by the API at all.
  */
+/**
+ * Light, dark or follow the system.
+ *
+ * A segmented control rather than a switch: a two-state toggle cannot express
+ * three options, and "follow the system" is the one most people want but would
+ * never find behind a toggle. The current resolution is spelled out under it,
+ * because "System" alone does not tell you what you are actually looking at.
+ */
+function AppearanceCard() {
+	const { preference, resolved, setTheme } = useTheme();
+
+	return (
+		<Card
+			title="Appearance"
+			hint="Remembered in this browser, not on your account — the right answer on a warehouse terminal is rarely the right one on a laptop at night.">
+			<div
+				role="radiogroup"
+				aria-label="Colour theme"
+				className="inline-flex bg-surface-2 border border-line rounded p-[3px] gap-[3px]">
+				{THEME_OPTIONS.map((option) => {
+					const active = preference === option.id;
+					return (
+						<button
+							key={option.id}
+							role="radio"
+							aria-checked={active}
+							onClick={() => setTheme(option.id)}
+							className={`flex items-center gap-2 px-3.5 py-[7px] rounded text-[12.5px] font-bold cursor-pointer border transition-colors duration-150 ${
+								active
+									? 'bg-surface border-line-2 text-brand-600'
+									: 'bg-transparent border-transparent text-muted hover:text-body-2'
+							}`}>
+							<svg
+								width="15"
+								height="15"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="1.9"
+								strokeLinecap="round"
+								strokeLinejoin="round">
+								{option.icon}
+							</svg>
+							{option.label}
+						</button>
+					);
+				})}
+			</div>
+
+			{preference === 'system' && (
+				<p className="text-[12px] text-muted-2 mt-2.5 mb-0">
+					Following your device, which is currently{' '}
+					<strong className="font-bold text-body-2">{resolved}</strong>. It will
+					change with it.
+				</p>
+			)}
+		</Card>
+	);
+}
+
 export default function SettingsPage() {
 	const { user } = useAuth();
 	const [params, setParams] = useSearchParams();
@@ -128,11 +189,13 @@ export default function SettingsPage() {
 				Settings
 			</h1>
 			<p className="text-[13px] text-muted-2 m-0 mt-1 mb-5">
-				The Zoho connection and who can sign in.
+				How the app looks, the Zoho connection, and who can sign in.
 			</p>
 
 			<Notice tone="ok">{notice}</Notice>
 			<Notice tone="error">{error}</Notice>
+
+			<AppearanceCard />
 
 			<Card
 				title="Zoho connection"

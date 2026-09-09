@@ -5,6 +5,37 @@
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
+    <script>
+      /*
+       * Set the theme before the first paint.
+       *
+       * React cannot do this: by the time the bundle has parsed and mounted,
+       * the browser has already painted a light page, and a dark-mode user
+       * sees a white flash on every load. This runs synchronously in <head>,
+       * so the correct value is on <html> before anything is drawn.
+       *
+       * Kept deliberately tiny and defensive — it runs before any of our code,
+       * so a throw here would take the whole page down. Anything unreadable
+       * falls through to following the system.
+       */
+      (function () {
+        try {
+          var stored = localStorage.getItem('lsi:theme');
+          var preference =
+            stored === 'light' || stored === 'dark' ? stored : 'system';
+          var resolved =
+            preference === 'system'
+              ? window.matchMedia &&
+                window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+              : preference;
+          document.documentElement.setAttribute('data-theme', resolved);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
     <meta
       name="description"
       content="Reorder low stock and record lost sales, on top of Zoho Books."

@@ -289,7 +289,7 @@ export default function ReorderSuggestionsPage() {
 				{suggestions === null ? (
 					<div className="px-5 py-16 text-center">
 						<div className="w-14 h-14 rounded bg-brand-50 border border-brand-100 mx-auto mb-3.5 flex items-center justify-center">
-							<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#408dfb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+							<svg className="text-brand" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
 								<path d="M4 6h11" />
 								<circle cx="18" cy="6" r="2" />
 								<path d="M4 12h5" />
@@ -324,7 +324,7 @@ export default function ReorderSuggestionsPage() {
 							{busy ? (
 								<span className="w-5 h-5 border-2 border-brand-200 border-t-brand rounded-full animate-spin" />
 							) : (
-								<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1a9d54" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+								<svg className="text-ok" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
 									<path d="M20 6L9 17l-5-5" />
 								</svg>
 							)}

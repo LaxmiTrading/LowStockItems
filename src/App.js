@@ -10,6 +10,7 @@ import LoginPage from './pages/LoginPage';
 import AcceptInvitePage from './pages/AcceptInvitePage';
 import SettingsPage from './pages/SettingsPage';
 import { AuthProvider, useAuth } from './lib/auth';
+import { ThemeProvider } from './lib/theme';
 
 /**
  * Authentication.
@@ -87,13 +88,18 @@ export default function App() {
 	// survive a refresh — and that rewrite must not swallow /api/*.
 	return (
 		<BrowserRouter>
-			<AuthProvider>
-				<Routes>
-					{/* Reachable without a session: it is how an invited user gets one. */}
-					<Route path="/accept-invite" element={<AcceptInvitePage />} />
-					<Route path="*" element={<Protected />} />
-				</Routes>
-			</AuthProvider>
+			{/* Outside AuthProvider: the login and error screens are themed too,
+			    and the choice is a property of this browser rather than of the
+			    account signed into it. */}
+			<ThemeProvider>
+				<AuthProvider>
+					<Routes>
+						{/* Reachable without a session: it is how an invited user gets one. */}
+						<Route path="/accept-invite" element={<AcceptInvitePage />} />
+						<Route path="*" element={<Protected />} />
+					</Routes>
+				</AuthProvider>
+			</ThemeProvider>
 		</BrowserRouter>
 	);
 }

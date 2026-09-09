@@ -130,11 +130,11 @@ export default function CustomerPicker({
 						height="16"
 						viewBox="0 0 24 24"
 						fill="none"
-						stroke="#8b919a"
+						stroke="currentColor"
 						strokeWidth="2"
 						strokeLinecap="round"
 						strokeLinejoin="round"
-						className={`flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>
+						className={`text-muted flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>
 						<path d="M6 9l6 6 6-6" />
 					</svg>
 				</button>
@@ -143,7 +143,7 @@ export default function CustomerPicker({
 					<div className="absolute top-[42px] left-0 right-0 min-w-[320px] animate-slide-down bg-surface border border-line-2 rounded shadow-pop z-30 overflow-hidden">
 						<div className="p-2">
 							<div className="flex items-center gap-2 h-9 border border-line-2 rounded px-[9px] transition-colors focus-within:border-muted-3">
-								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a7adb5" strokeWidth="2" className="flex-shrink-0">
+								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-muted-3">
 									<circle cx="11" cy="11" r="7" />
 									<path d="M21 21l-4-4" strokeLinecap="round" />
 								</svg>

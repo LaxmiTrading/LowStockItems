@@ -121,15 +121,15 @@ export default function ModeSelect({
 					<span className="text-[13.5px] text-muted-3">{placeholder}</span>
 				)}
 				<svg
-					width="16"
+						width="16"
 					height="16"
 					viewBox="0 0 24 24"
 					fill="none"
-					stroke="#8b919a"
+					stroke="currentColor"
 					strokeWidth="2"
 					strokeLinecap="round"
 					strokeLinejoin="round"
-					className={`flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>
+					className={`text-muted flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}>
 					<path d="M6 9l6 6 6-6" />
 				</svg>
 			</button>

@@ -40,12 +40,12 @@ const GROUP_TABS = [
 // Hues are sampled from the brand's neighbourhood rather than the full wheel —
 // a rainbow of vendor chips would fight the one blue this app is built on.
 const AVATAR_TINTS = [
-	'bg-brand-100 text-brand-700',
-	'bg-[#e6f0f8] text-[#1f6088]',
-	'bg-[#e9ecf7] text-[#414c8a]',
-	'bg-[#e4f1ee] text-[#1d6b5c]',
-	'bg-[#f0ecf8] text-[#5a4a8c]',
-	'bg-[#e8f1e6] text-[#3f6b34]',
+	'bg-[rgb(var(--c-tint-1-bg))] text-[rgb(var(--c-tint-1-fg))]',
+	'bg-[rgb(var(--c-tint-2-bg))] text-[rgb(var(--c-tint-2-fg))]',
+	'bg-[rgb(var(--c-tint-3-bg))] text-[rgb(var(--c-tint-3-fg))]',
+	'bg-[rgb(var(--c-tint-4-bg))] text-[rgb(var(--c-tint-4-fg))]',
+	'bg-[rgb(var(--c-tint-5-bg))] text-[rgb(var(--c-tint-5-fg))]',
+	'bg-[rgb(var(--c-tint-6-bg))] text-[rgb(var(--c-tint-6-fg))]',
 ];
 
 const tintFor = (name) => {
@@ -531,7 +531,7 @@ export default function ZohoItemsTable() {
 								className={`flex items-center gap-[9px] px-[18px] py-2.5 border-t border-b border-line-3 cursor-pointer select-none transition-colors duration-150 ${
 									expanded
 										? 'bg-brand-50 border-brand-100'
-										: 'bg-surface-2 hover:bg-[#edf1f6]'
+										: 'bg-surface-2 hover:bg-line-3'
 								}`}>
 								{/* Sits at the same offset as the row checkboxes below it. */}
 								<Checkbox
@@ -644,7 +644,7 @@ export default function ZohoItemsTable() {
 				{!loading && filteredItems.length === 0 && (
 					<div className="px-5 py-16 text-center">
 						<div className="w-14 h-14 rounded bg-surface-2 border border-line mx-auto mb-3.5 flex items-center justify-center">
-							<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a7adb5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+							<svg className="text-muted-3" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
 								<circle cx="11" cy="11" r="7" />
 								<path d="M21 21l-4-4" />
 							</svg>

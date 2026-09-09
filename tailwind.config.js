@@ -6,59 +6,55 @@ module.exports = {
 	theme: {
 		extend: {
 			colors: {
-				app: '#eef1f5', // page background
-				surface: '#ffffff',
-				'surface-2': '#f6f7f9', // table headers, group rows, segmented track
-				'surface-3': '#fbfcfd', // metric cards
-				'surface-4': '#f4f5f7', // PO overlay background
-				sidebar: '#fafbfc',
-
-				line: '#e6e8eb', // default border
-				'line-2': '#d7dbe0', // input border
-				'line-3': '#eceef1', // soft divider
-				'line-4': '#f1f2f4', // softest divider
-
-				heading: '#232830',
-				body: '#333a45',
-				'body-2': '#4a5057',
-				'body-3': '#5b6270',
-				muted: '#8b919a',
-				'muted-2': '#9aa0a8',
-				'muted-3': '#a7adb5', // placeholder
-				'muted-4': '#cfd4da', // unchecked control border
-
-				brand: '#408dfb', // primary buttons, active nav, checkbox fill
-				link: '#2f7be0',
-				'link-hover': '#1f6ad0',
-				'brand-bg': '#eaf2ff',
-				'brand-border': '#cfe0fb',
-
-				// A full ramp behind the single brand blue. Gradients, glows and
-				// tinted washes all need neighbours of the brand hue, and mixing
-				// them inline is how a palette drifts.
-				'brand-50': '#f2f7ff',
-				'brand-100': '#e2edff',
-				'brand-200': '#c7dcfe',
-				'brand-300': '#9cc3fd',
-				'brand-400': '#6ba6fc',
-				'brand-500': '#408dfb',
-				'brand-600': '#2f7be0',
-				'brand-700': '#2263bb',
-				'brand-800': '#1b4e94',
-				'brand-900': '#173f76',
-
-				ok: '#1a9d54',
-				'ok-bg': '#e9f7ef',
-				'ok-border': '#bfe5cf',
-				warn: '#c77700',
-				'warn-2': '#b06a00',
-				'warn-bg': '#fdf2dc',
-				'warn-border': '#f2d79a',
-				danger: '#e0322b',
-				'danger-bg': '#fdeceb',
-				'danger-border': '#f3d2d2',
-
-				'row-selected': '#f4f9ff',
+				// Every colour resolves through a CSS custom property, so a theme is a
+				// change of variables rather than a second set of classes. The
+				// rgb(... / <alpha-value>) form is what keeps opacity modifiers such
+				// as bg-brand-50/50 and bg-heading/35 working. Values live in
+				// src/index.css.
+				app: 'rgb(var(--c-app) / <alpha-value>)',
+				surface: 'rgb(var(--c-surface) / <alpha-value>)',
+				'surface-2': 'rgb(var(--c-surface-2) / <alpha-value>)',
+				'surface-3': 'rgb(var(--c-surface-3) / <alpha-value>)',
+				'surface-4': 'rgb(var(--c-surface-4) / <alpha-value>)',
+				sidebar: 'rgb(var(--c-sidebar) / <alpha-value>)',
+				line: 'rgb(var(--c-line) / <alpha-value>)',
+				'line-2': 'rgb(var(--c-line-2) / <alpha-value>)',
+				'line-3': 'rgb(var(--c-line-3) / <alpha-value>)',
+				'line-4': 'rgb(var(--c-line-4) / <alpha-value>)',
+				heading: 'rgb(var(--c-heading) / <alpha-value>)',
+				body: 'rgb(var(--c-body) / <alpha-value>)',
+				'body-2': 'rgb(var(--c-body-2) / <alpha-value>)',
+				'body-3': 'rgb(var(--c-body-3) / <alpha-value>)',
+				muted: 'rgb(var(--c-muted) / <alpha-value>)',
+				'muted-2': 'rgb(var(--c-muted-2) / <alpha-value>)',
+				'muted-3': 'rgb(var(--c-muted-3) / <alpha-value>)',
+				'muted-4': 'rgb(var(--c-muted-4) / <alpha-value>)',
+				brand: 'rgb(var(--c-brand) / <alpha-value>)',
+				link: 'rgb(var(--c-link) / <alpha-value>)',
+				'link-hover': 'rgb(var(--c-link-hover) / <alpha-value>)',
+				'brand-bg': 'rgb(var(--c-brand-bg) / <alpha-value>)',
+				'brand-border': 'rgb(var(--c-brand-border) / <alpha-value>)',
+				'brand-50': 'rgb(var(--c-brand-50) / <alpha-value>)',
+				'brand-100': 'rgb(var(--c-brand-100) / <alpha-value>)',
+				'brand-200': 'rgb(var(--c-brand-200) / <alpha-value>)',
+				'brand-300': 'rgb(var(--c-brand-300) / <alpha-value>)',
+				'brand-400': 'rgb(var(--c-brand-400) / <alpha-value>)',
+				'brand-500': 'rgb(var(--c-brand-500) / <alpha-value>)',
+				'brand-600': 'rgb(var(--c-brand-600) / <alpha-value>)',
+				'brand-700': 'rgb(var(--c-brand-700) / <alpha-value>)',
+				'brand-800': 'rgb(var(--c-brand-800) / <alpha-value>)',
+				'brand-900': 'rgb(var(--c-brand-900) / <alpha-value>)',
+				ok: 'rgb(var(--c-ok) / <alpha-value>)',
+				'ok-bg': 'rgb(var(--c-ok-bg) / <alpha-value>)',
+				'ok-border': 'rgb(var(--c-ok-border) / <alpha-value>)',
+				warn: 'rgb(var(--c-warn) / <alpha-value>)',
+				'warn-2': 'rgb(var(--c-warn-2) / <alpha-value>)',
+				'warn-bg': 'rgb(var(--c-warn-bg) / <alpha-value>)',
+				'warn-border': 'rgb(var(--c-warn-border) / <alpha-value>)',
+				danger: 'rgb(var(--c-danger) / <alpha-value>)',
+				'danger-bg': 'rgb(var(--c-danger-bg) / <alpha-value>)',
+				'danger-border': 'rgb(var(--c-danger-border) / <alpha-value>)',
+				'row-selected': 'rgb(var(--c-row-selected) / <alpha-value>)',
 			},
 			fontFamily: {
 				sans: ['Lato', 'system-ui', 'sans-serif'],
@@ -67,12 +63,14 @@ module.exports = {
 			// so a lifted surface reads as sitting on this background and not as a
 			// grey haze over it.
 			boxShadow: {
-				card: '0 1px 2px rgba(28,42,70,.04), 0 1px 3px rgba(28,42,70,.06)',
-				'card-hover':
-					'0 2px 4px rgba(28,42,70,.05), 0 8px 20px rgba(28,42,70,.09)',
-				pop: '0 4px 10px rgba(28,42,70,.08), 0 14px 34px rgba(28,42,70,.14)',
-				float: '0 10px 20px rgba(28,42,70,.10), 0 24px 60px rgba(28,42,70,.18)',
-				'inner-line': 'inset 0 -1px 0 #eceef1',
+				// Defined in src/index.css so they can change with the theme. A
+				// shadow tuned for a white page is nearly invisible on a dark one,
+				// and on dark it wants to be black rather than blue-grey.
+				card: 'var(--shadow-card)',
+				'card-hover': 'var(--shadow-card-hover)',
+				pop: 'var(--shadow-pop)',
+				float: 'var(--shadow-float)',
+				'inner-line': 'var(--shadow-inner-line)',
 			},
 			transitionTimingFunction: {
 				// One easing curve for everything that moves: a gentle overshoot-free

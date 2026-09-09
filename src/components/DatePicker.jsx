@@ -124,7 +124,7 @@ export default function DatePicker({ value, onChange, max, invalid }) {
 							: 'border-line-2'
 				}`}>
 				<span className="num">{value || 'Select a date'}</span>
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#408dfb" strokeWidth="2" className="flex-shrink-0">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-brand">
 					<rect x="3" y="5" width="18" height="16" rx="2" />
 					<path d="M3 9h18M8 3v4M16 3v4" strokeLinecap="round" />
 				</svg>
@@ -175,11 +175,11 @@ export default function DatePicker({ value, onChange, max, invalid }) {
 
 							let cls =
 								'w-[34px] h-[34px] rounded border-none bg-transparent text-[13px] font-[inherit] flex items-center justify-center mx-auto transition-all duration-150 ease-smooth ';
-							if (disabled) cls += 'text-[#dfe3e8] cursor-not-allowed';
+							if (disabled) cls += 'text-line-2 cursor-not-allowed';
 							else if (isSel)
 								cls +=
 									'bg-brand text-white font-black cursor-pointer';
-							else if (c.other) cls += 'text-[#c4c9d0] cursor-pointer';
+							else if (c.other) cls += 'text-muted-4 cursor-pointer';
 							else if (isToday)
 								cls +=
 									'text-brand font-bold border border-brand-200 cursor-pointer';

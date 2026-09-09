@@ -80,7 +80,7 @@ export default function BulkAddItemsModal({
 	return (
 		<div
 			className="fixed inset-0 z-[80] flex items-center justify-center p-[30px] animate-fade-in"
-			style={{ background: 'rgba(20,30,50,.42)' }}
+			style={{ background: 'rgb(var(--c-overlay) / 0.42)' }}
 			onClick={(e) => e.target === e.currentTarget && onClose()}>
 			<div className="animate-pop-in w-[1000px] max-w-full h-[620px] max-h-[92vh] bg-surface rounded shadow-float flex flex-col overflow-hidden">
 				{/* Header */}
@@ -102,7 +102,7 @@ export default function BulkAddItemsModal({
 					<div className="w-1/2 border-r border-line-3 flex flex-col min-h-0">
 						<div className="px-4 py-3.5">
 							<div className="flex items-center gap-2 border border-line-2 rounded px-[11px] py-[9px] transition-colors focus-within:border-muted-3">
-								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a7adb5" strokeWidth="2" className="flex-shrink-0">
+								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-muted-3">
 									<circle cx="11" cy="11" r="7" />
 									<path d="M21 21l-4-4" strokeLinecap="round" />
 								</svg>
@@ -209,7 +209,7 @@ export default function BulkAddItemsModal({
 							{pickedList.length === 0 ? (
 								<div className="h-full flex flex-col items-center justify-center text-center p-10">
 									<div className="w-12 h-12 rounded bg-surface-2 border border-line flex items-center justify-center mb-3">
-										<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a7adb5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+										<svg className="text-muted-3" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
 											<path d="M20 6L9 17l-5-5" />
 										</svg>
 									</div>

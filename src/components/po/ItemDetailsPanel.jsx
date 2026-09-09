@@ -237,10 +237,10 @@ export default function ItemDetailsPanel({ itemId, itemName, vendorId, onClose }
 	return createPortal(
 		<div
 			className="fixed inset-0 z-[95] flex justify-end"
-			style={{ background: 'rgba(20,30,50,.32)' }}
+			style={{ background: 'rgb(var(--c-overlay) / 0.32)' }}
 			onClick={(e) => e.target === e.currentTarget && close()}>
 			<div
-				className="relative overflow-hidden w-[880px] max-w-full h-screen bg-surface shadow-[-12px_0_40px_rgba(10,20,40,.18)] flex flex-col">
+				className="relative overflow-hidden w-[880px] max-w-full h-screen bg-surface shadow-[-12px_0_40px_rgb(var(--c-shadow)/0.30)] flex flex-col">
 				{/* Header */}
 				<div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-line flex-shrink-0">
 					<div className="min-w-0">

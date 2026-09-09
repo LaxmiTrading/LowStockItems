@@ -7,7 +7,7 @@
 }
 
 .item-row:hover {
-	background-color: #f5f8fc;
+	background-color: rgb(var(--c-row-hover));
 }
 
 /* The row's own actions stay out of the way until the row is under the

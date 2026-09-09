@@ -52,12 +52,12 @@ const relativeDay = (d) => {
 // Same tinting rule as the low-stock group chips: stable per name, and drawn
 // from a narrow range so the page keeps one accent colour.
 const AVATAR_TINTS = [
-	'bg-brand-100 text-brand-700',
-	'bg-[#e6f0f8] text-[#1f6088]',
-	'bg-[#e9ecf7] text-[#414c8a]',
-	'bg-[#e4f1ee] text-[#1d6b5c]',
-	'bg-[#f0ecf8] text-[#5a4a8c]',
-	'bg-[#e8f1e6] text-[#3f6b34]',
+	'bg-[rgb(var(--c-tint-1-bg))] text-[rgb(var(--c-tint-1-fg))]',
+	'bg-[rgb(var(--c-tint-2-bg))] text-[rgb(var(--c-tint-2-fg))]',
+	'bg-[rgb(var(--c-tint-3-bg))] text-[rgb(var(--c-tint-3-fg))]',
+	'bg-[rgb(var(--c-tint-4-bg))] text-[rgb(var(--c-tint-4-fg))]',
+	'bg-[rgb(var(--c-tint-5-bg))] text-[rgb(var(--c-tint-5-fg))]',
+	'bg-[rgb(var(--c-tint-6-bg))] text-[rgb(var(--c-tint-6-fg))]',
 ];
 
 const tintFor = (name) => {
@@ -339,7 +339,7 @@ export default function LostSalesListPage() {
 					   show: a heading, then a sentence explaining why it matters. */
 					<div className="px-5 py-16 text-center">
 						<div className="w-14 h-14 rounded bg-brand-50 border border-brand-100 mx-auto mb-3.5 flex items-center justify-center">
-							<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#408dfb" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+							<svg className="text-brand" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
 								<path d="M4 4h12l4 4v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
 								<path d="M8 13h8M8 17h5" />
 							</svg>

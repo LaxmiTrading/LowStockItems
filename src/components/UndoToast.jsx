@@ -31,24 +31,23 @@ export default function UndoToast({ label, duration = 5000, onUndo, onExpire }) 
 	return (
 		<div
 			role="status"
-			className="toast-rise relative overflow-hidden rounded shadow-[0_14px_38px_rgba(10,20,40,.45)] w-[380px]"
-			style={{ background: '#232830' }}>
+			className="toast-rise relative overflow-hidden rounded shadow-[0_14px_38px_rgb(var(--c-shadow)/0.45)] w-[380px]"
+			style={{ background: 'rgb(var(--c-toast-bg))' }}>
 			<div className="flex items-center gap-3 px-4 py-3.5">
 				<span
-					className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0"
-					style={{ background: '#1a9d54' }}>
+					className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0 bg-ok">
 					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
 						<path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
 					</svg>
 				</span>
 
 				<span className="flex-1 min-w-0">
-					<span className="block text-[13.5px] font-black text-white truncate">
+					<span className="block text-[13.5px] font-black text-[rgb(var(--c-toast-fg))] truncate">
 						{label}
 					</span>
 					<span
 						className="block text-[11.5px] mt-0.5 num"
-						style={{ color: '#8a93a0' }}>
+						style={{ color: 'rgb(var(--c-toast-muted))' }}>
 						Applying in {remaining}s
 					</span>
 				</span>
@@ -62,8 +61,8 @@ export default function UndoToast({ label, duration = 5000, onUndo, onExpire }) 
 			</div>
 
 			<div
-				className="toast-drain absolute bottom-0 left-0 h-[3px] w-full"
-				style={{ background: '#1a9d54', animationDuration: `${duration}ms` }}
+				className="toast-drain absolute bottom-0 left-0 h-[3px] w-full bg-ok"
+				style={{ animationDuration: `${duration}ms` }}
 			/>
 		</div>
 	);

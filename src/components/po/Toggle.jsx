@@ -17,7 +17,7 @@ export default function Toggle({ on, onChange, disabled }) {
 			{/* The knob travels on a spring curve — it lands with a hint of settle,
 			    which is what makes a switch feel switched rather than repainted. */}
 			<span
-				className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-[0_1px_2px_rgba(28,42,70,.3)] transition-[left] duration-200 ease-spring"
+				className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-[0_1px_2px_rgb(var(--c-shadow)/0.35)] transition-[left] duration-200 ease-spring"
 				style={{ left: on ? 18 : 2 }}
 			/>
 		</button>
