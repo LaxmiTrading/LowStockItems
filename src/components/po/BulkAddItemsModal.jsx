@@ -140,13 +140,13 @@ export default function BulkAddItemsModal({
 										<div
 											key={item.item_id}
 											onClick={() => toggle(item)}
-											className={`flex justify-between items-center px-4 py-[11px] cursor-pointer border-b border-line-4 transition-colors duration-100 ${
+											className={`flex justify-between items-center px-3 lg:px-4 py-2.5 lg:py-[11px] cursor-pointer border-b border-line-4 transition-colors duration-100 ${
 												checked
 													? 'bg-brand-50'
 													: 'hover:bg-surface-2'
 											}`}>
 											<div className="min-w-0">
-												<div className="text-[13.5px] font-black text-heading truncate">
+												<div className="text-[12px] lg:text-[13.5px] font-black text-heading truncate">
 													{item.name}
 													{already && (
 														<span className="ml-1.5 text-[10px] font-black text-warn-2 bg-warn-bg border border-warn-border rounded-full px-1.5 py-px">
@@ -154,18 +154,18 @@ export default function BulkAddItemsModal({
 														</span>
 													)}
 												</div>
-												<div className="text-[11px] text-muted-2 mt-0.5 truncate">
+												<div className="text-[10.5px] lg:text-[11px] text-muted-2 mt-0.5 truncate">
 													SKU: {item.sku || '—'} · Purchase Rate:{' '}
 													{money(item.purchase_rate ?? item.rate)}
 												</div>
 											</div>
-											<div className="flex items-center gap-3 pl-3">
+											<div className="flex items-center gap-2 lg:gap-3 pl-2 lg:pl-3">
 												<div className="text-right whitespace-nowrap">
-													<div className="text-[11px] text-muted-2">
+													<div className="text-[9.5px] lg:text-[11px] text-muted-2 uppercase lg:normal-case tracking-[.03em] lg:tracking-normal">
 														Stock on Hand
 													</div>
 													<div
-														className={`num text-[12.5px] font-bold mt-0.5 ${
+														className={`num text-[11.5px] lg:text-[12.5px] font-bold mt-0.5 ${
 															stock > 0 ? 'text-ok' : 'text-danger'
 														}`}>
 														{stock}
