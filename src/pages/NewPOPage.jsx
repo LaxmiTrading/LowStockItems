@@ -481,9 +481,14 @@ export default function NewPOPage() {
 				</div>
 
 				{/* Summary — one right-aligned block, each control in the row whose
-				    number it governs. */}
+				    number it governs.
+
+				    The same 86px the table holds back for the row actions, so the
+				    block ends on the table's right rule rather than on the page's.
+				    The actions sit outside the table because they are not a
+				    column; the totals should not line up with them. */}
 				<div className="px-4 sm:px-8 pb-10 flex justify-end">
-					<div className="w-full sm:w-[380px] bg-surface-3 border border-line rounded px-4 sm:px-[18px] py-4">
+					<div className="w-full sm:w-[380px] lg:mr-[86px] bg-surface-3 border border-line rounded px-4 sm:px-[18px] py-4">
 						<div className="flex justify-between items-center py-1 text-[13.5px]">
 							<span className="font-bold text-body">Sub Total</span>
 							<span className="num font-bold">{money(summary.subTotal)}</span>
