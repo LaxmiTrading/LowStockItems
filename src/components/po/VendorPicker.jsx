@@ -112,7 +112,7 @@ export default function VendorPicker({ vendors, loading, value, onChange }) {
 							: 'Select a vendor'}
 				</span>
 				<svg
-						width="16"
+					width="16"
 					height="16"
 					viewBox="0 0 24 24"
 					fill="none"

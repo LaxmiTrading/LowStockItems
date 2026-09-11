@@ -121,7 +121,7 @@ export default function ModeSelect({
 					<span className="text-[13.5px] text-muted-3">{placeholder}</span>
 				)}
 				<svg
-						width="16"
+					width="16"
 					height="16"
 					viewBox="0 0 24 24"
 					fill="none"

@@ -90,7 +90,7 @@ export default function AdvancedCustomerSearch({
 					<select
 						value={field}
 						onChange={(e) => setField(e.target.value)}
-						className="h-[38px] border border-line-2 rounded px-2.5 text-[13.5px] bg-surface text-body outline-none cursor-pointer focus:border-muted-3">
+						className="h-[38px] border border-line-2 rounded pl-2.5 text-[13.5px] bg-surface text-body outline-none cursor-pointer focus:border-muted-3">
 						{FIELDS.map((f) => (
 							<option key={f.id} value={f.id}>
 								{f.label}

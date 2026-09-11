@@ -253,6 +253,74 @@ export default function ZohoItemsTable() {
 
 	const selectedCount = selectedItemIds.size;
 
+	// Grouping and the expand-all toggle, written once and placed twice: on a
+	// desktop they sit at the right-hand end of the search row, and below that
+	// width they take a row of their own, where the segmented control wants the
+	// full span. Only one of the two placements is ever displayed.
+	const groupControls = (
+		<>
+			<span className="hidden lg:block text-[12px] text-muted font-bold">
+				Group by
+			</span>
+			{/* The white plate slides between the three options rather than
+			    being repainted under whichever one is active, so a change of
+			    grouping is something you watch happen. Equal thirds keep the
+			    travel a plain multiple of the plate's own width.
+
+			    The height is stated rather than left to the buttons' leading,
+			    so the control lines up to the pixel with the search box and the
+			    expand button beside it. */}
+			<div className="relative flex flex-1 lg:flex-none lg:w-[300px] h-10 lg:h-9 bg-surface-2 border border-line rounded p-[3px]">
+				<span
+					aria-hidden
+					className="absolute top-[3px] bottom-[3px] left-[3px] rounded bg-surface border border-line transition-transform duration-300 ease-smooth"
+					style={{
+						width: 'calc((100% - 6px) / 3)',
+						transform: `translateX(${GROUP_TABS.findIndex((t) => t.id === groupBy) * 100}%)`,
+					}}
+				/>
+				{GROUP_TABS.map((t) => (
+					<button
+						key={t.id}
+						onClick={() => {
+							setGroupBy(t.id);
+							setExpandedGroups(new Set());
+						}}
+						className={`relative z-10 flex-1 flex items-center justify-center border-none bg-transparent px-1 rounded text-[12.5px] font-bold cursor-pointer whitespace-nowrap transition-colors duration-200 ${
+							groupBy === t.id
+								? 'text-brand-600'
+								: 'text-muted hover:text-body-3'
+						}`}>
+						{t.label}
+					</button>
+				))}
+			</div>
+
+			<button
+				onClick={toggleExpandAll}
+				aria-label={allCollapsed ? 'Expand all groups' : 'Collapse all groups'}
+				className="h-10 lg:h-9 w-10 sm:w-auto sm:px-3 rounded border border-line-2 bg-surface text-body-3 font-bold text-[12.5px] cursor-pointer flex items-center justify-center sm:gap-1.5 hover:border-brand-300 hover:text-brand-600 transition-all duration-200 ease-smooth flex-shrink-0">
+				<svg
+					width="13"
+					height="13"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					strokeWidth="2.2"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					className="transition-transform duration-300 ease-smooth"
+					style={{ transform: allCollapsed ? 'none' : 'rotate(180deg)' }}>
+					<path d="M7 13l5 5 5-5" />
+					<path d="M7 6l5 5 5-5" />
+				</svg>
+				<span className="hidden sm:block w-[52px] text-left">
+					{allCollapsed ? 'Expand' : 'Collapse'}
+				</span>
+			</button>
+		</>
+	);
+
 	return (
 		<div className="px-4 sm:px-6 lg:px-7 pt-5 lg:pt-6 pb-[110px] max-w-[1600px]">
 			{/* Title row */}
@@ -397,7 +465,7 @@ export default function ZohoItemsTable() {
 			    They are two containers because sticky pins a whole element: one
 			    control cannot stay put while its neighbours in the same row
 			    scroll away. */}
-			<div className="sticky top-[52px] z-20 -mx-4 sm:-mx-6 lg:-mx-7 px-4 sm:px-6 lg:px-7 pt-1 pb-2.5 bg-app">
+			<div className="sticky top-[52px] z-20 -mx-4 sm:-mx-6 lg:-mx-7 px-4 sm:px-6 lg:px-7 pt-1 pb-2.5 lg:pb-3 bg-app">
 				<div className="flex items-center gap-2.5">
 					<div className="group flex items-center gap-2 border border-line-2 rounded bg-surface px-[11px] h-10 lg:h-9 flex-1 lg:flex-none lg:w-72 transition-colors focus-within:border-muted-3">
 						<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-muted-3 transition-colors group-focus-within:text-brand">
@@ -437,65 +505,18 @@ export default function ZohoItemsTable() {
 						</span>
 					)}
 
+					{/* Right-justified, on the same baseline as the search box:
+					    on a wide screen the row has the width to spare, and
+					    putting grouping at the far end keeps the left edge a
+					    single column of search-then-list. */}
+					<div className="hidden lg:flex items-center gap-2.5 ml-auto">
+						{groupControls}
+					</div>
 				</div>
 			</div>
 
-			<div className="flex items-center gap-2.5 pb-3">
-				<span className="hidden lg:block text-[12px] text-muted font-bold">
-					Group by
-				</span>
-				{/* The white plate slides between the three options rather than
-				    being repainted under whichever one is active, so a change of
-				    grouping is something you watch happen. Equal thirds keep the
-				    travel a plain multiple of the plate's own width. */}
-				<div className="relative flex flex-1 lg:flex-none lg:w-[300px] bg-surface-2 border border-line rounded p-[3px]">
-					<span
-						aria-hidden
-						className="absolute top-[3px] bottom-[3px] left-[3px] rounded bg-surface border border-line transition-transform duration-300 ease-smooth"
-						style={{
-							width: 'calc((100% - 6px) / 3)',
-							transform: `translateX(${GROUP_TABS.findIndex((t) => t.id === groupBy) * 100}%)`,
-						}}
-					/>
-					{GROUP_TABS.map((t) => (
-						<button
-							key={t.id}
-							onClick={() => {
-								setGroupBy(t.id);
-								setExpandedGroups(new Set());
-							}}
-							className={`relative z-10 flex-1 border-none bg-transparent px-1 py-[7px] sm:py-[5px] rounded text-[12.5px] font-bold cursor-pointer whitespace-nowrap transition-colors duration-200 ${
-								groupBy === t.id
-									? 'text-brand-600'
-									: 'text-muted hover:text-body-3'
-							}`}>
-							{t.label}
-						</button>
-					))}
-				</div>
-
-				<button
-					onClick={toggleExpandAll}
-					aria-label={allCollapsed ? 'Expand all groups' : 'Collapse all groups'}
-					className="h-10 sm:h-9 w-10 sm:w-auto sm:px-3 rounded border border-line-2 bg-surface text-body-3 font-bold text-[12.5px] cursor-pointer flex items-center justify-center sm:gap-1.5 hover:border-brand-300 hover:text-brand-600 transition-all duration-200 ease-smooth flex-shrink-0">
-						<svg
-							width="13"
-							height="13"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2.2"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-							className="transition-transform duration-300 ease-smooth"
-							style={{ transform: allCollapsed ? 'none' : 'rotate(180deg)' }}>
-							<path d="M7 13l5 5 5-5" />
-							<path d="M7 6l5 5 5-5" />
-						</svg>
-					<span className="hidden sm:block w-[52px] text-left">
-						{allCollapsed ? 'Expand' : 'Collapse'}
-					</span>
-				</button>
+			<div className="lg:hidden flex items-center gap-2.5 pb-3">
+				{groupControls}
 			</div>
 
 			{/* Table */}

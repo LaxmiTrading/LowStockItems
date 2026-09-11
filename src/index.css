@@ -45,6 +45,11 @@
 	--c-muted-2: 154 160 168;
 	--c-muted-3: 167 173 181;
 	--c-muted-4: 207 212 218;
+
+	/* The chevron a <select> wears. Held as a token because a data URI
+	   cannot interpolate a custom property, so each theme needs its own
+	   copy — matched on how heavy it reads, not on the token name. */
+	--icon-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b919a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
 	--c-brand: 64 141 251;
 	--c-link: 47 123 224;
 	--c-link-hover: 31 106 208;
@@ -134,6 +139,7 @@
 	--c-muted-2: 110 118 129;
 	--c-muted-3: 99 107 117;
 	--c-muted-4: 74 82 92;
+	--icon-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237d8590' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
 	--c-brand: 77 148 251;
 	--c-link: 106 168 253;
 	--c-link-hover: 141 189 254;
@@ -226,6 +232,30 @@ input,
 button,
 select {
 	font-family: inherit;
+}
+
+/* A native <select> draws its own arrow: the browser picks the glyph, the
+   size and the offset, none of which agree with the icons every other
+   field in the app carries. So it is drawn here instead — the same
+   chevron the vendor, mode and customer pickers draw — 16px, the same
+   path, on the same 12px gutter — in a colour that follows the theme
+   rather than the operating system.
+
+   It cannot rotate on open the way those triggers do: a native select
+   gives CSS nothing to hang that off. A fair trade for keeping the OS
+   popup, which behaves better on a phone than anything we would build.
+
+   The padding is reserved here too, so no call site has to remember to
+   leave room for it — an easy thing to get a few pixels wrong twice. */
+select {
+	appearance: none;
+	-webkit-appearance: none;
+	background-image: var(--icon-chevron);
+	background-repeat: no-repeat;
+	background-position: right 12px center;
+	background-size: 16px 16px;
+	padding-right: 34px;
+	cursor: pointer;
 }
 
 input::placeholder {

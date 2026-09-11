@@ -307,7 +307,7 @@ export default function SettingsPage() {
 								onChange={(e) =>
 									setInviteForm((f) => ({ ...f, role: e.target.value }))
 								}
-								className={`${field} w-auto pr-8`}>
+								className={`${field} w-auto`}>
 								<option value="buyer">Buyer</option>
 								<option value="administrator">Administrator</option>
 							</select>
