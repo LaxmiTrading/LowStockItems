@@ -109,7 +109,10 @@ export function jsonError(error, request) {
 				...(isApp && error.details ? { details: error.details } : {}),
 			},
 		},
-		{ status: isApp ? error.status : 500, headers: corsHeaders(request) },
+		{
+			status: isApp ? error.status : 500,
+			headers: { ...corsHeaders(request), 'Cache-Control': 'no-store' },
+		},
 	);
 }
 

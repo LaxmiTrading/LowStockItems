@@ -21,10 +21,39 @@
   # public address — it is in the browser's address bar of every visitor, so
   # finding it in build output is expected rather than a leak.
   #
-  # AUTH_JWT_SECRET and BOOTSTRAP_TOKEN are deliberately NOT omitted, and must
-  # not be: they are real secrets, and the scanner finding either one would be
-  # a genuine incident rather than noise to silence. Scanning stays on.
+  # AUTH_JWT_SECRET is deliberately NOT omitted, and must not be: it is a real
+  # secret, and the scanner finding it would be a genuine incident rather than
+  # noise to silence. Scanning stays on.
   SECRETS_SCAN_OMIT_KEYS = "APP_BASE_URL"
+
+# Netlify already sends HSTS for this domain. These are the ones it does not.
+#
+# There is deliberately no script-src here. index.html carries an inline script
+# that reads the saved theme before first paint, so a strict script-src would
+# need a hash that must be updated by hand every time that script changes — and
+# when it drifts the page goes blank with no warning. A content policy that
+# breaks the site on a whim is worse than the one narrow protection it adds, so
+# this block sticks to the directives that cannot misfire.
+[[headers]]
+  for = "/*"
+
+  [headers.values]
+    # Clickjacking. frame-ancestors is the modern spelling and X-Frame-Options
+    # the one older browsers understand; both, because they cost nothing.
+    Content-Security-Policy = "frame-ancestors 'none'"
+    X-Frame-Options = "DENY"
+
+    # Stops a response being re-interpreted as a script or stylesheet on the
+    # strength of its bytes rather than its declared type.
+    X-Content-Type-Options = "nosniff"
+
+    # An invitation link carries its single-use token in the query string, so a
+    # full referrer from that page would hand the token to any third-party
+    # origin it happened to request. Send the origin alone off-site.
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+    # Nothing here uses any of them.
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 
 # The API must be matched before the SPA catch-all below, or every /api/*
 # request would be answered with index.html. Netlify evaluates redirects in
