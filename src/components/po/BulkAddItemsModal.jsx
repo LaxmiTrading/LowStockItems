@@ -97,9 +97,9 @@ export default function BulkAddItemsModal({
 					</button>
 				</div>
 
-				<div className="flex-1 flex flex-col lg:flex-row min-h-0">
+				<div className="flex-1 flex flex-col sm:flex-row min-h-0">
 					{/* Left — catalogue */}
-					<div className="flex-1 lg:w-1/2 lg:flex-none border-b lg:border-b-0 lg:border-r border-line-3 flex flex-col min-h-0">
+					<div className="flex-1 sm:w-1/2 sm:flex-none border-b sm:border-b-0 sm:border-r border-line-3 flex flex-col min-h-0">
 						<div className="px-4 py-3.5">
 							<div className="flex items-center gap-2 border border-line-2 rounded px-[11px] py-[9px] transition-colors focus-within:border-muted-3">
 								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-muted-3">
@@ -187,7 +187,7 @@ export default function BulkAddItemsModal({
 					</div>
 
 					{/* Right — selection */}
-					<div className="flex-1 lg:w-1/2 lg:flex-none flex flex-col min-h-0">
+					<div className="flex-1 sm:w-1/2 sm:flex-none flex flex-col min-h-0">
 						<div className="flex items-center justify-between px-5 pt-4 pb-3">
 							<div className="flex items-center gap-2.5">
 								<span className="text-[17px] font-black text-heading tracking-[-.01em]">
@@ -226,30 +226,50 @@ export default function BulkAddItemsModal({
 										<span className="text-[13.5px] font-bold text-body min-w-0 truncate">
 											{item.name}
 										</span>
-										<div className="flex items-center border border-line-2 rounded overflow-hidden h-[34px] flex-shrink-0">
+										<div className="flex items-center gap-2 flex-shrink-0">
+											<div className="flex items-center border border-line-2 rounded overflow-hidden h-[34px]">
+												<button
+													onClick={() =>
+														setQty(item.item_id, picked[item.item_id] - 1)
+													}
+													aria-label="Decrease quantity"
+													className="w-[34px] h-full border-none bg-surface-2 cursor-pointer text-body-3 text-[16px] font-bold hover:bg-brand-50 hover:text-brand-600">
+													−
+												</button>
+												<input
+													value={picked[item.item_id]}
+													inputMode="numeric"
+													aria-label={`Quantity for ${item.name}`}
+													onChange={(e) =>
+														setQty(item.item_id, parseInt(e.target.value, 10) || 1)
+													}
+													className="num w-[52px] h-full border-none border-x border-line text-center text-[13.5px] font-black text-heading outline-none focus:bg-brand-50"
+												/>
+												<button
+													onClick={() =>
+														setQty(item.item_id, picked[item.item_id] + 1)
+													}
+													aria-label="Increase quantity"
+													className="w-[34px] h-full border-none bg-surface-2 cursor-pointer text-body-3 text-[16px] font-bold hover:bg-brand-50 hover:text-brand-600">
+													+
+												</button>
+											</div>
+
+											{/* Un-picking used to mean finding the row again in the
+											    catalogue, which after a search or a scroll means going
+											    to look for it. You notice the wrong pick here, so this
+											    is where undoing it belongs. */}
 											<button
-												onClick={() =>
-													setQty(item.item_id, picked[item.item_id] - 1)
-												}
-												className="w-[34px] h-full border-none bg-surface-2 cursor-pointer text-body-3 text-[16px] font-bold hover:bg-brand-50 hover:text-brand-600">
-												−
-											</button>
-											<input
-												value={picked[item.item_id]}
-												onChange={(e) =>
-													setQty(
-														item.item_id,
-														parseInt(e.target.value, 10) || 1,
-													)
-												}
-												className="num w-[52px] h-full border-none border-x border-line text-center text-[13.5px] font-black text-heading outline-none focus:bg-brand-50"
-											/>
-											<button
-												onClick={() =>
-													setQty(item.item_id, picked[item.item_id] + 1)
-												}
-												className="w-[34px] h-full border-none bg-surface-2 cursor-pointer text-body-3 text-[16px] font-bold hover:bg-brand-50 hover:text-brand-600">
-												+
+												onClick={() => toggle(item)}
+												title={`Remove ${item.name}`}
+												aria-label={`Remove ${item.name}`}
+												className="no-press w-9 h-9 sm:w-[34px] sm:h-[34px] flex-shrink-0 rounded border border-line-2 bg-surface flex items-center justify-center cursor-pointer text-body-3 hover:bg-danger-bg hover:border-danger-border hover:text-danger">
+												<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+													<path d="M3 6h18" />
+													<path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+													<path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6" />
+													<path d="M10 11v6M14 11v6" />
+												</svg>
 											</button>
 										</div>
 									</div>
