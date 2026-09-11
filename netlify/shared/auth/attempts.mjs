@@ -27,10 +27,17 @@ import { query, queryMany, queryOne } from '../db.mjs';
 
 const WINDOW_MINUTES = 15;
 
-// Deliberately different: an address is a much stronger signal of one actor
-// than an email is, and the per-account limit is the one a stranger can aim at
-// someone else, so it is the looser of the two.
-const MAX_FAILURES_PER_IP = 10;
+// The per-account limit is the one that actually protects an account: it
+// applies however many addresses the guessing is spread across. The per-address
+// limit only adds the ability to cut off one host spraying many accounts, which
+// in an application with a handful of accounts is a small extra win.
+//
+// It is set well above the per-account limit because everyone in one office
+// shares a public address, and a threshold low enough to catch a sprayer is
+// also low enough to lock out the whole building. Ten was too low: a burst of
+// fourteen attempts against an address that does not exist locked out a real
+// user behind the same connection.
+const MAX_FAILURES_PER_IP = 30;
 const MAX_FAILURES_PER_EMAIL = 12;
 
 export const OUTCOMES = {
@@ -107,13 +114,36 @@ export async function enforceLoginLimit({ email, origin }) {
 		// Every parameter is cast explicitly. Left to inference, `$3 || ' minutes'`
 		// and a bare ANY($4) are the kind of thing that parses here and fails on
 		// the server, and this query is on the critical path of every sign-in.
+		// Failures are only counted since the last time the same address, or the
+		// same account, actually signed in. Getting your password right is the
+		// clearest possible evidence that the attempts before it were yours and
+		// were honest mistakes, so they stop being held against you.
+		//
+		// The rows themselves are left alone — this changes what the limiter
+		// counts, not what the audit trail remembers.
 		counts = await queryOne(
-			`SELECT
-			   count(*) FILTER (WHERE ip = $1::text)            AS ip_failures,
-			   count(*) FILTER (WHERE email = lower($2::text))  AS email_failures
-			 FROM login_attempts
-			 WHERE at > NOW() - make_interval(mins => $3::int)
-			   AND outcome = ANY($4::text[])`,
+			`WITH window_start AS (
+			   SELECT NOW() - make_interval(mins => $3::int) AS floor
+			 ),
+			 last_success AS (
+			   SELECT
+			     (SELECT max(at) FROM login_attempts
+			       WHERE ip = $1::text AND outcome = 'success')           AS by_ip,
+			     (SELECT max(at) FROM login_attempts
+			       WHERE email = lower($2::text) AND outcome = 'success') AS by_email
+			 )
+			 SELECT
+			   count(*) FILTER (
+			     WHERE a.ip = $1::text
+			       AND a.at > GREATEST(w.floor, COALESCE(s.by_ip, w.floor))
+			   ) AS ip_failures,
+			   count(*) FILTER (
+			     WHERE a.email = lower($2::text)
+			       AND a.at > GREATEST(w.floor, COALESCE(s.by_email, w.floor))
+			   ) AS email_failures
+			 FROM login_attempts a, window_start w, last_success s
+			 WHERE a.at > w.floor
+			   AND a.outcome = ANY($4::text[])`,
 			[origin.ip, email ?? '', WINDOW_MINUTES, FAILURES],
 		);
 	} catch (error) {
