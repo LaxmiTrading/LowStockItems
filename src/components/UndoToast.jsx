@@ -32,7 +32,7 @@ export default function UndoToast({ label, duration = 5000, onUndo, onExpire }) 
 		<div
 			role="status"
 			className="toast-rise relative overflow-hidden rounded shadow-[0_14px_38px_rgb(var(--c-shadow)/0.45)] w-full sm:w-[380px]"
-			style={{ background: 'rgb(var(--c-toast-bg))' }}>
+			style={{ background: 'rgb(var(--c-float-bg))' }}>
 			<div className="flex items-center gap-3 px-4 py-3.5">
 				<span
 					className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0 bg-ok">
@@ -42,12 +42,12 @@ export default function UndoToast({ label, duration = 5000, onUndo, onExpire }) 
 				</span>
 
 				<span className="flex-1 min-w-0">
-					<span className="block text-[13.5px] font-black text-[rgb(var(--c-toast-fg))] truncate">
+					<span className="block text-[13.5px] font-black text-[rgb(var(--c-float-fg))] truncate">
 						{label}
 					</span>
 					<span
 						className="block text-[11.5px] mt-0.5 num"
-						style={{ color: 'rgb(var(--c-toast-muted))' }}>
+						style={{ color: 'rgb(var(--c-float-muted))' }}>
 						Applying in {remaining}s
 					</span>
 				</span>

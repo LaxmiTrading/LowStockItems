@@ -706,17 +706,17 @@ export default function ZohoItemsTable() {
 			    is and never scrolls out of reach. */}
 			{selectedCount > 0 && (
 				<div className="fixed bottom-3 sm:bottom-6 left-[var(--nav-w)] right-0 z-30 flex justify-center px-3 sm:px-6 pointer-events-none">
-					<div className="toast-rise pointer-events-auto w-full sm:w-auto flex flex-wrap items-center gap-2 sm:gap-3.5 px-3 sm:pl-4 sm:pr-3 py-2.5 rounded bg-heading text-white shadow-float">
+					<div className="toast-rise pointer-events-auto w-full sm:w-auto flex flex-wrap items-center gap-2 sm:gap-3.5 px-3 sm:pl-4 sm:pr-3 py-2.5 rounded bg-[rgb(var(--c-float-bg))] text-[rgb(var(--c-float-fg))] shadow-float">
 						<span className="text-[13.5px] font-bold whitespace-nowrap">
 							<span className="num font-black">{selectedCount}</span> item
 							{selectedCount !== 1 ? 's' : ''} selected
 						</span>
 
-						<span className="hidden sm:block w-px h-6 bg-white/15" />
+						<span className="hidden sm:block w-px h-6 bg-[rgb(var(--c-float-border))]" />
 
 						<button
 							onClick={() => setSelectedItemIds(new Set())}
-							className="h-9 sm:h-8 px-3 rounded bg-transparent border border-white/20 text-white/85 font-bold text-[12.5px] cursor-pointer hover:bg-white/10 hover:text-white whitespace-nowrap">
+							className="h-9 sm:h-8 px-3 rounded bg-transparent border border-[rgb(var(--c-float-border))] text-[rgb(var(--c-float-muted))] font-bold text-[12.5px] cursor-pointer hover:bg-white/10 hover:text-[rgb(var(--c-float-fg))] whitespace-nowrap">
 							Clear
 						</button>
 						<button

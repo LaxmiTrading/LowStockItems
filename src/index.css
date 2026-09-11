@@ -100,13 +100,18 @@
 	--shadow-float: 0 10px 20px rgb(var(--c-shadow) / 0.10), 0 24px 60px rgb(var(--c-shadow) / 0.18);
 	--shadow-inner-line: inset 0 -1px 0 rgb(var(--c-line-3));
 
-	/* The undo toast is a card that floats above everything. On a light page it
-	   is dark for contrast; on a dark one it has to go lighter instead, or it
-	   disappears into the background it is meant to sit on top of. */
-	--c-toast-bg: 35 40 48;
-	--c-toast-fg: 255 255 255;
-	--c-toast-muted: 138 147 160;
-	--c-toast-border: 58 66 76;
+	/* Surfaces that float above the page: the undo toast, the selection bar and
+	   the lost-sale hover card. On a light page they are dark for contrast; on a
+	   dark one they must go *lighter* instead, or they disappear into the
+	   background they are meant to sit on top of.
+
+	   This is why they cannot simply use `bg-heading`: that token inverts with
+	   the theme, so a bar painted with it and labelled `text-white` ends up
+	   white-on-white in dark mode. */
+	--c-float-bg: 35 40 48;
+	--c-float-fg: 255 255 255;
+	--c-float-muted: 138 147 160;
+	--c-float-border: 58 66 76;
 }
 
 :root[data-theme='dark'] {
@@ -180,10 +185,10 @@
 	--shadow-float: 0 10px 20px rgb(var(--c-shadow) / 0.50), 0 24px 60px rgb(var(--c-shadow) / 0.70);
 	--shadow-inner-line: inset 0 -1px 0 rgb(var(--c-line-3));
 
-	--c-toast-bg: 47 54 64;
-	--c-toast-fg: 240 242 245;
-	--c-toast-muted: 154 162 173;
-	--c-toast-border: 74 84 96;
+	--c-float-bg: 47 54 64;
+	--c-float-fg: 240 242 245;
+	--c-float-muted: 154 162 173;
+	--c-float-border: 74 84 96;
 }
 
 /* Base styles mirror the Claude Design canvas (docs/design/LowStockItems.dc.html). */

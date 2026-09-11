@@ -568,8 +568,8 @@ function ItemsCell({ record }) {
 									top: card.top,
 									transform: `translate(-50%, ${card.flip ? '-100%' : '0'})`,
 								}}
-								className="z-[120] pointer-events-none animate-fade-in min-w-[220px] max-w-[340px] bg-heading text-white rounded shadow-float px-3 py-2.5">
-								<div className="text-[10px] font-black tracking-[.06em] text-white/55 mb-1.5">
+								className="z-[120] pointer-events-none animate-fade-in min-w-[220px] max-w-[340px] bg-[rgb(var(--c-float-bg))] text-[rgb(var(--c-float-fg))] rounded shadow-float px-3 py-2.5">
+								<div className="text-[10px] font-black tracking-[.06em] text-[rgb(var(--c-float-muted))] mb-1.5">
 									{items.length} ITEMS WANTED
 								</div>
 								{items.map((it, i) => (
@@ -577,7 +577,7 @@ function ItemsCell({ record }) {
 										key={i}
 										className="flex items-baseline justify-between gap-3 py-[3px] text-[12.5px]">
 										<span className="truncate">{it.item_name || '—'}</span>
-										<span className="num flex-shrink-0 font-bold text-white/70">
+										<span className="num flex-shrink-0 font-bold text-[rgb(var(--c-float-muted))]">
 											{it.qty_wanted == null ? '—' : it.qty_wanted}
 										</span>
 									</div>
