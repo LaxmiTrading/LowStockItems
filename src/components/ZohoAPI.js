@@ -37,6 +37,37 @@ function authHeaders() {
 	return {};
 }
 
+/**
+ * Whether an item is one this app should ever act on.
+ *
+ * Zoho keeps inactive items in the catalogue — discontinued lines, superseded
+ * SKUs, things marked inactive precisely so nobody orders them again. They
+ * still carry a reorder level and a stock figure, so nothing downstream can
+ * tell them apart from a live item; they simply must not be offered.
+ *
+ * Written as "not explicitly inactive" rather than "status === 'active'": if a
+ * response ever omits the field, the safer failure is to show an item that
+ * should have been hidden rather than to silently empty every list.
+ */
+export const isActiveItem = (item) =>
+	String(item?.status ?? 'active').toLowerCase() !== 'inactive';
+
+/**
+ * Whether Zoho tracks stock for this item.
+ *
+ * `item_type` is one of inventory, sales, purchases, sales_and_purchases.
+ * Only the first has stock on hand, a reorder point or a capacity, so it is
+ * the only kind a reorder suggestion can be computed for — for the rest there
+ * is no quantity to reason about and any proposal would be noise.
+ *
+ * Deliberately strict, unlike isActiveItem: an absent item_type means we
+ * cannot show it is stock-tracked, and proposing reorder points for services
+ * is worse than proposing none. reorderRun reports what it excluded so this
+ * never fails silently.
+ */
+export const isInventoryItem = (item) =>
+	String(item?.item_type ?? '').toLowerCase() === 'inventory';
+
 // ─── STEP 1: fetch all low stock items (paginated) ───────────────────────────
 
 async function getLowStockItems() {
@@ -49,7 +80,9 @@ async function getLowStockItems() {
 		const res = await fetchWithRetry(url, { headers: authHeaders() });
 		const data = await res.json();
 
-		allItems = allItems.concat(data.items || []);
+		// filter_by takes a single value, so Status.Lowstock cannot also ask for
+		// Status.Active — inactive rows are dropped here instead.
+		allItems = allItems.concat((data.items || []).filter(isActiveItem));
 		hasMore = data.page_context?.has_more_page;
 		page++;
 		await delay(300);
@@ -562,7 +595,9 @@ export async function getAllItems(onProgress) {
 
 			// Bounded so a malformed page_context can never spin forever.
 			while (hasMore && page <= 100) {
-				const url = `${BASE_ITEMS}/items?organization_id=${ORG_ID}&page=${page}&per_page=200`;
+				// Asked for server-side so inactive items never cross the wire —
+				// on a large catalogue that is whole pages not fetched.
+				const url = `${BASE_ITEMS}/items?organization_id=${ORG_ID}&filter_by=Status.Active&page=${page}&per_page=200`;
 				const res = await fetchWithRetry(url, { headers: authHeaders() });
 				const data = await res.json();
 
@@ -570,7 +605,10 @@ export async function getAllItems(onProgress) {
 					throw new Error(data.message || 'Could not load the item catalogue.');
 				}
 
-				allItems = allItems.concat(data.items || []);
+				// Filtered again rather than trusted: if Zoho ever ignores the
+				// filter, the belt-and-braces pass keeps inactive items out of the
+				// pickers instead of quietly letting them through.
+				allItems = allItems.concat((data.items || []).filter(isActiveItem));
 				for (const fn of _allItemsListeners) fn(allItems, false);
 
 				hasMore = data.page_context?.has_more_page;

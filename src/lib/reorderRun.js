@@ -14,7 +14,7 @@
 // job to resume from.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { getAllItems } from '../components/ZohoAPI';
+import { getAllItems, isInventoryItem } from '../components/ZohoAPI';
 import { getSales, hasSales } from './salesCache';
 import { listLostSales } from './lostSales';
 import { computeSuggestion, DEFAULT_SETTINGS } from './reorderEngine';
@@ -29,6 +29,9 @@ const IDLE = {
 	status: {}, // item_id -> pending | approved | rejected
 	error: null,
 	scanned: 0,
+	// What the candidate filter left out, so the page can say so. Excluding
+	// silently is how a wrong field name looks exactly like "nothing to do".
+	excluded: { nonInventory: 0 },
 	finishedAt: null,
 };
 
@@ -112,17 +115,27 @@ export async function startRun() {
 		const items = await getAllItems();
 		if (token !== runToken) return;
 
-		// Only items that could produce a suggestion are worth a call: one with
-		// neither a reorder point nor a max capacity has nothing to compare a
-		// proposal against.
-		const candidates = items.filter(
+		// Only stock-tracked items can have a reorder point at all. A
+		// sales-only or purchase-only item has no quantity to reason about, so a
+		// proposal for one is noise — and it would still cost a sales-report
+		// call to produce.
+		const stockTracked = items.filter(isInventoryItem);
+
+		// Then: only items that could produce a suggestion are worth a call. One
+		// with neither a reorder point nor a max capacity has nothing to compare
+		// a proposal against.
+		const candidates = stockTracked.filter(
 			(i) =>
 				Number(i.reorder_level) > 0 ||
 				Number(i.cf_maximum_capacity) > 0 ||
 				lostByItem.has(i.item_id),
 		);
 
-		set({ scanned: candidates.length, progress: { done: 0, total: candidates.length } });
+		set({
+			scanned: candidates.length,
+			excluded: { nonInventory: items.length - stockTracked.length },
+			progress: { done: 0, total: candidates.length },
+		});
 
 		const out = [];
 		for (let i = 0; i < candidates.length; i++) {

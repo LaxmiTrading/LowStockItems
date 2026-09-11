@@ -78,7 +78,7 @@ export default function ReorderSuggestionsPage() {
 	// The run lives outside React so it survives navigating away — see
 	// src/lib/reorderRun.js. The page is only a view onto it.
 	const run = useSyncExternalStore(subscribeToRun, getRunState);
-	const { suggestions, status, progress, error, scanned } = run;
+	const { suggestions, status, progress, error, scanned, excluded } = run;
 	const busy = run.phase === 'running';
 
 	// Toasts are ephemeral UI and stay local: leaving the page commits whatever
@@ -166,8 +166,8 @@ export default function ReorderSuggestionsPage() {
 						Reorder point suggestions
 					</h1>
 					<p className="text-[13px] text-muted-2 m-0 mt-1">
-						Proposed reorder points and capacities, from a year of sales and
-						your logged lost sales.
+						Proposed reorder points and capacities for active, stock-tracked
+						items, from a year of sales and your logged lost sales.
 					</p>
 				</div>
 				<div className="flex-1" />
@@ -303,8 +303,10 @@ export default function ReorderSuggestionsPage() {
 						</div>
 						<p className="text-[13px] text-muted-2 m-0 max-w-[520px] mx-auto leading-relaxed">
 							Suggestions are worked out from each item’s trailing 365-day sales
-							and the lost sales you have logged. That is one report call per
-							item, so it runs only when you ask.
+							and the lost sales you have logged. Only active, stock-tracked
+							items are considered — a sales- or purchase-only item has no
+							quantity to reorder. That is one report call per item, so it runs
+							only when you ask.
 						</p>
 						<button
 							onClick={compute}
@@ -340,7 +342,20 @@ export default function ReorderSuggestionsPage() {
 							{busy
 								? 'No suggestions yet. Rows appear here as they are found.'
 								: suggestions.length === 0
-									? `Checked ${scanned} item${scanned === 1 ? '' : 's'}; every reorder point and max capacity is already close enough to demand.`
+									? scanned === 0
+										? // Nothing was even eligible. Say why, rather than
+											// leaving "no changes" to imply the catalogue is in
+											// perfect shape when in fact nothing qualified.
+											`No stock-tracked items qualified${
+												excluded?.nonInventory
+													? ` — ${excluded.nonInventory} sales- or purchase-only item${excluded.nonInventory === 1 ? ' was' : 's were'} skipped, as they carry no stock to reorder`
+													: ''
+											}.`
+										: `Checked ${scanned} stock-tracked item${scanned === 1 ? '' : 's'}; every reorder point and max capacity is already close enough to demand.${
+												excluded?.nonInventory
+													? ` ${excluded.nonInventory} sales- or purchase-only item${excluded.nonInventory === 1 ? '' : 's'} skipped.`
+													: ''
+											}`
 									: `${counts.approved} approved${counts.rejected > 0 ? `, ${counts.rejected} rejected` : ''}.`}
 						</p>
 					</div>
