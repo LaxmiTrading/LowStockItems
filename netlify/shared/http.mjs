@@ -15,10 +15,7 @@ import { AppError } from './errors.mjs';
 // credentials are involved. Same-origin is the only caller in production.
 function corsHeaders(request) {
 	const origin = request?.headers?.get('origin') ?? '';
-	const allowed =
-		origin && (origin.startsWith('http://localhost') || isAppOrigin(origin))
-			? origin
-			: appBaseUrl();
+	const allowed = isAllowedOrigin(origin) ? origin : appBaseUrl();
 	return {
 		'Access-Control-Allow-Origin': allowed,
 		'Access-Control-Allow-Credentials': 'true',
@@ -43,6 +40,30 @@ function isAppOrigin(origin) {
 	}
 }
 
+// Exact origins, never a prefix. This was `origin.startsWith('http://localhost')`,
+// which is a different and much wider test than it reads as: a domain called
+// localhost.example.com starts with those characters. Production was
+// reflecting exactly that back with Access-Control-Allow-Credentials: true, so
+// anyone who registered such a name held a credentialed cross-origin grant
+// against this API. SameSite=Lax kept it from being usable — the browser will
+// not attach the session cookie to a cross-site fetch — but that is one cookie
+// attribute standing between a typo and account takeover.
+const DEVELOPMENT_ORIGINS = new Set([
+	'http://localhost:3000',
+	'http://localhost:8888',
+	'http://127.0.0.1:3000',
+	'http://127.0.0.1:8888',
+]);
+
+function isAllowedOrigin(origin) {
+	if (!origin) return false;
+	if (isAppOrigin(origin)) return true;
+	// A deployment served over https is production; it has no business
+	// answering to a developer's machine.
+	if (appBaseUrl().startsWith('https://')) return false;
+	return DEVELOPMENT_ORIGINS.has(origin);
+}
+
 export function preflight(request) {
 	return new Response(null, { status: 204, headers: corsHeaders(request) });
 }
@@ -52,7 +73,17 @@ export function preflight(request) {
 export function jsonSuccess(data, request, { status = 200, headers = {} } = {}) {
 	return Response.json(
 		{ ok: true, data },
-		{ status, headers: { ...corsHeaders(request), ...headers } },
+		{
+			status,
+			headers: {
+				...corsHeaders(request),
+				// Every one of these responses is either account-specific or a
+				// mutation's result. Neither belongs in a proxy or in the
+				// browser's back-forward cache.
+				'Cache-Control': 'no-store',
+				...headers,
+			},
+		},
 	);
 }
 
@@ -134,14 +165,4 @@ export function withErrorHandling(handler) {
 			return jsonError(error, request);
 		}
 	};
-}
-
-/** The caller's IP, for rate limiting. */
-export function requestIp(request, context) {
-	return (
-		context?.ip ??
-		request.headers.get('x-nf-client-connection-ip') ??
-		request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-		'unknown-ip'
-	);
 }

@@ -67,9 +67,6 @@ export const logoutRequest = () => api.post('/api/auth/logout', {});
 
 export const fetchMe = () => api.get('/api/me');
 
-export const bootstrapAdmin = (payload) =>
-	api.post('/api/auth/bootstrap', payload);
-
 export const acceptInvite = (token, password) =>
 	api.post('/api/auth/accept-invite', { token, password });
 
@@ -84,6 +81,15 @@ export const inviteUser = (payload) => api.post('/api/auth/invite', payload);
 
 export const setUserStatus = (userId, status) =>
 	api.post('/api/auth/set-user-status', { userId, status });
+
+/* --------------------------------------------------------------- security */
+
+export const loginActivity = (limit = 50) =>
+	api.get(`/api/auth/login-activity?limit=${limit}`);
+
+/** Omit userId to end your own sessions everywhere. */
+export const endSessions = (userId) =>
+	api.post('/api/auth/end-sessions', userId ? { userId } : {});
 
 /* ------------------------------------------------------------------ zoho */
 

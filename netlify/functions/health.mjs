@@ -13,11 +13,25 @@
  */
 
 import { connectionInfo, queryOne } from '../shared/db.mjs';
+import { requireAdministrator } from '../shared/auth/session.mjs';
 import { resolveCredentials } from '../shared/zoho/tokens.mjs';
 
 const present = (name) => Boolean(process.env[name] && process.env[name].length > 0);
 
-export default async () => {
+export default async (request) => {
+	// Anonymous callers get the single bit they need to see that something is
+	// wrong. The detail below is reconnaissance: it names which secrets are
+	// configured, confirms the database is reachable and, through
+	// profileCount, how many accounts there are to attack. That was readable
+	// by anyone on the internet.
+	let administrator = false;
+	try {
+		await requireAdministrator(request);
+		administrator = true;
+	} catch {
+		administrator = false;
+	}
+
 	const env = {
 		APP_BASE_URL: present('APP_BASE_URL'),
 		AUTH_JWT_SECRET: present('AUTH_JWT_SECRET'),
@@ -85,6 +99,13 @@ export default async () => {
 
 	const ready =
 		env.AUTH_JWT_SECRET_long_enough && database.reachable && database.schemaReady;
+
+	if (!administrator) {
+		return Response.json(
+			{ ok: true, data: { ready } },
+			{ status: 200, headers: { 'Cache-Control': 'no-store' } },
+		);
+	}
 
 	return Response.json(
 		{ ok: true, data: { ready, env, database, zoho } },
