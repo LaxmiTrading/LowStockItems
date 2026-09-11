@@ -281,7 +281,7 @@ export default function ZohoItemsTable() {
 			{/* Metric cards */}
 			<div className="grid grid-cols-2 sm:grid-cols-3 gap-3 lg:gap-4 mb-4 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
 				<MetricCard
-					label="Low stock SKUs"
+					label="Low stock"
 					value={metrics.total}
 					hint="Below their reorder point"
 					icon={
@@ -389,10 +389,16 @@ export default function ZohoItemsTable() {
 				</div>
 			)}
 
-			{/* Toolbar — sticks under the top bar so search and grouping stay
-			    reachable however far down a long catalogue you are. */}
-			<div className="sticky top-[52px] z-20 -mx-4 sm:-mx-6 lg:-mx-7 px-4 sm:px-6 lg:px-7 pt-1 pb-3 bg-app">
-				<div className="flex items-center gap-2.5 flex-wrap">
+			{/* Search sticks under the top bar: on a long catalogue, finding an
+			    item is the thing you want to reach from anywhere. Grouping is set
+			    once and then scrolled past, so it stays with the page — a second
+			    sticky row costs height that the list needs more.
+
+			    They are two containers because sticky pins a whole element: one
+			    control cannot stay put while its neighbours in the same row
+			    scroll away. */}
+			<div className="sticky top-[52px] z-20 -mx-4 sm:-mx-6 lg:-mx-7 px-4 sm:px-6 lg:px-7 pt-1 pb-2.5 bg-app">
+				<div className="flex items-center gap-2.5">
 					<div className="group flex items-center gap-2 border border-line-2 rounded bg-surface px-[11px] h-10 lg:h-9 flex-1 lg:flex-none lg:w-72 transition-colors focus-within:border-muted-3">
 						<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-muted-3 transition-colors group-focus-within:text-brand">
 							<circle cx="11" cy="11" r="7" />
@@ -431,42 +437,47 @@ export default function ZohoItemsTable() {
 						</span>
 					)}
 
-					<div className="hidden lg:block flex-1" />
+				</div>
+			</div>
 
-					<span className="hidden lg:block text-[12px] text-muted font-bold">Group by</span>
-					{/* The white plate slides between the three options rather than
-					    being repainted under whichever one is active, so a change of
-					    grouping is something you watch happen. Equal thirds keep the
-					    travel a plain multiple of the plate's own width. */}
-					<div className="order-2 lg:order-none relative flex w-full lg:w-[300px] bg-surface-2 border border-line rounded p-[3px]">
-						<span
-							aria-hidden
-							className="absolute top-[3px] bottom-[3px] left-[3px] rounded bg-surface border border-line transition-transform duration-300 ease-smooth"
-							style={{
-								width: 'calc((100% - 6px) / 3)',
-								transform: `translateX(${GROUP_TABS.findIndex((t) => t.id === groupBy) * 100}%)`,
+			<div className="flex items-center gap-2.5 pb-3">
+				<span className="hidden lg:block text-[12px] text-muted font-bold">
+					Group by
+				</span>
+				{/* The white plate slides between the three options rather than
+				    being repainted under whichever one is active, so a change of
+				    grouping is something you watch happen. Equal thirds keep the
+				    travel a plain multiple of the plate's own width. */}
+				<div className="relative flex flex-1 lg:flex-none lg:w-[300px] bg-surface-2 border border-line rounded p-[3px]">
+					<span
+						aria-hidden
+						className="absolute top-[3px] bottom-[3px] left-[3px] rounded bg-surface border border-line transition-transform duration-300 ease-smooth"
+						style={{
+							width: 'calc((100% - 6px) / 3)',
+							transform: `translateX(${GROUP_TABS.findIndex((t) => t.id === groupBy) * 100}%)`,
+						}}
+					/>
+					{GROUP_TABS.map((t) => (
+						<button
+							key={t.id}
+							onClick={() => {
+								setGroupBy(t.id);
+								setExpandedGroups(new Set());
 							}}
-						/>
-						{GROUP_TABS.map((t) => (
-							<button
-								key={t.id}
-								onClick={() => {
-									setGroupBy(t.id);
-									setExpandedGroups(new Set());
-								}}
-								className={`relative z-10 flex-1 border-none bg-transparent px-1 py-[7px] sm:py-[5px] rounded text-[12.5px] font-bold cursor-pointer whitespace-nowrap transition-colors duration-200 ${
-									groupBy === t.id
-										? 'text-brand-600'
-										: 'text-muted hover:text-body-3'
-								}`}>
-								{t.label}
-							</button>
-						))}
-					</div>
+							className={`relative z-10 flex-1 border-none bg-transparent px-1 py-[7px] sm:py-[5px] rounded text-[12.5px] font-bold cursor-pointer whitespace-nowrap transition-colors duration-200 ${
+								groupBy === t.id
+									? 'text-brand-600'
+									: 'text-muted hover:text-body-3'
+							}`}>
+							{t.label}
+						</button>
+					))}
+				</div>
 
-					<button
-						onClick={toggleExpandAll}
-						className="order-1 lg:order-none h-10 sm:h-9 px-3 rounded border border-line-2 bg-surface text-body-3 font-bold text-[12.5px] cursor-pointer flex items-center gap-1.5 hover:border-brand-300 hover:text-brand-600 transition-all duration-200 ease-smooth flex-shrink-0">
+				<button
+					onClick={toggleExpandAll}
+					aria-label={allCollapsed ? 'Expand all groups' : 'Collapse all groups'}
+					className="h-10 sm:h-9 w-10 sm:w-auto sm:px-3 rounded border border-line-2 bg-surface text-body-3 font-bold text-[12.5px] cursor-pointer flex items-center justify-center sm:gap-1.5 hover:border-brand-300 hover:text-brand-600 transition-all duration-200 ease-smooth flex-shrink-0">
 						<svg
 							width="13"
 							height="13"
@@ -481,11 +492,10 @@ export default function ZohoItemsTable() {
 							<path d="M7 13l5 5 5-5" />
 							<path d="M7 6l5 5 5-5" />
 						</svg>
-						<span className="w-[52px] text-left">
-							{allCollapsed ? 'Expand' : 'Collapse'}
-						</span>
-					</button>
-				</div>
+					<span className="hidden sm:block w-[52px] text-left">
+						{allCollapsed ? 'Expand' : 'Collapse'}
+					</span>
+				</button>
 			</div>
 
 			{/* Table */}
