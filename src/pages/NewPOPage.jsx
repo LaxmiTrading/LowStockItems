@@ -374,9 +374,9 @@ export default function NewPOPage() {
 	);
 
 	return (
-		<div className="fixed top-[52px] left-[236px] right-0 bottom-0 z-[70] bg-surface flex flex-col">
+		<div className="fixed top-[52px] left-[var(--nav-w)] right-0 bottom-0 z-[70] bg-surface flex flex-col">
 			{/* Header — title left, close right, thin rule beneath. */}
-			<div className="h-16 flex-shrink-0 bg-surface border-b border-line flex items-center justify-between gap-3 px-6">
+			<div className="h-14 sm:h-16 flex-shrink-0 bg-surface border-b border-line flex items-center justify-between gap-2 px-3 sm:px-6">
 				<div className="flex items-center gap-3 min-w-0">
 					<button
 						onClick={() => navigate('/')}
@@ -388,7 +388,7 @@ export default function NewPOPage() {
 						</svg>
 					</button>
 					<div className="flex items-center gap-2.5 min-w-0">
-					<h1 className="text-[21px] text-heading font-black tracking-[-.02em] truncate m-0">
+					<h1 className="text-[17px] sm:text-[21px] text-heading font-black tracking-[-.02em] truncate m-0">
 						New Purchase Order
 					</h1>
 					{filledLines.length > 0 && (
@@ -413,7 +413,7 @@ export default function NewPOPage() {
 			{/* Scrollable body */}
 			<div className="flex-1 overflow-y-auto overflow-x-hidden">
 				{(result || hydrating) && (
-					<div className="px-8 pt-5 flex flex-col gap-2.5">
+					<div className="px-4 sm:px-8 pt-5 flex flex-col gap-2.5">
 						{result && (
 							<div
 								className={`animate-slide-up-in flex items-center justify-between px-4 py-3 text-[13px] font-bold rounded border ${
@@ -447,7 +447,7 @@ export default function NewPOPage() {
 
 				{/* Vendor sits on a tinted band, the way Zoho groups the head of its
 				    form away from the rest. */}
-				<div className="bg-sidebar border-b border-line px-8 py-6">
+				<div className="bg-sidebar border-b border-line px-4 sm:px-8 py-5 sm:py-6">
 					<Field label="Vendor" required align="start">
 						<VendorPicker
 							vendors={vendors}
@@ -460,12 +460,12 @@ export default function NewPOPage() {
 				</div>
 
 				{/* The rest of the form, flat on white */}
-				<div className="px-8 py-6 flex flex-col gap-5">
+				<div className="px-4 sm:px-8 py-5 sm:py-6 flex flex-col gap-5">
 					<MethodPicker lines={lines} onApply={applyQuantities} />
 				</div>
 
 				{/* Item table */}
-				<div className="px-8 pb-6">
+				<div className="px-4 sm:px-8 pb-6">
 					<POItemTable
 						lines={lines}
 						allItems={allItems}
@@ -482,8 +482,8 @@ export default function NewPOPage() {
 
 				{/* Summary — one right-aligned block, each control in the row whose
 				    number it governs. */}
-				<div className="px-8 pb-10 flex justify-end">
-					<div className="w-[380px] max-w-full bg-surface-3 border border-line rounded px-[18px] py-4">
+				<div className="px-4 sm:px-8 pb-10 flex justify-end">
+					<div className="w-full sm:w-[380px] bg-surface-3 border border-line rounded px-4 sm:px-[18px] py-4">
 						<div className="flex justify-between items-center py-1 text-[13.5px]">
 							<span className="font-bold text-body">Sub Total</span>
 							<span className="num font-bold">{money(summary.subTotal)}</span>
@@ -563,11 +563,11 @@ export default function NewPOPage() {
 			</div>
 
 			{/* Footer — actions left, as Zoho places them. */}
-			<div className="flex-shrink-0 bg-surface border-t border-line flex items-center gap-3 px-6 py-3">
+			<div className="flex-shrink-0 bg-surface border-t border-line flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-3">
 				<button
 					onClick={handleCreate}
 					disabled={!canCreate}
-					className="h-[34px] px-4 rounded border border-brand bg-brand hover:bg-brand-600 text-white font-bold text-[13px] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 transition-all duration-200 ease-smooth">
+					className="h-10 sm:h-[34px] flex-1 sm:flex-none px-4 rounded border border-brand bg-brand hover:bg-brand-600 text-white font-bold text-[13px] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all duration-200 ease-smooth">
 					{creating && (
 						<span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
 					)}
@@ -576,7 +576,7 @@ export default function NewPOPage() {
 				<button
 					onClick={() => navigate('/')}
 					disabled={creating}
-					className="h-[34px] px-4 rounded border border-line-2 bg-surface text-body-2 font-bold text-[13px] cursor-pointer disabled:opacity-50 hover:bg-surface-2 hover:border-muted-4">
+					className="h-10 sm:h-[34px] px-4 rounded border border-line-2 bg-surface text-body-2 font-bold text-[13px] cursor-pointer disabled:opacity-50 hover:bg-surface-2 hover:border-muted-4">
 					Cancel
 				</button>
 
@@ -585,7 +585,7 @@ export default function NewPOPage() {
 				{/* The footer is where the decision is made, so the number the
 				    decision turns on is repeated here rather than left three
 				    scrolls up in the summary. */}
-				<div className="flex items-baseline gap-2.5 pr-1">
+				<div className="hidden sm:flex items-baseline gap-2.5 pr-1">
 					<span className="text-[12px] text-muted font-bold">
 						{readyLines.length} line{readyLines.length !== 1 ? 's' : ''} ready
 					</span>

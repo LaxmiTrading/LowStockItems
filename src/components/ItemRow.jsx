@@ -1,8 +1,10 @@
 import './ItemRow.css';
 import Checkbox from './Checkbox';
 import { simpleQuantityFor } from './ZohoAPI';
+import { useIsDesktop, useIsWide } from '../lib/useMediaQuery';
 
-// Shared so the header and the rows can never drift apart.
+// Shared so the header and the rows can never drift apart. Desktop only — the
+// card layout below lg has no columns to line up with.
 export const LOW_TABLE_COLS = '38px 2.4fr 1fr 1fr 1.4fr 1.2fr 1.3fr 0.9fr 1.1fr';
 
 const money = (v) =>
@@ -14,19 +16,21 @@ const money = (v) =>
 
 const dec2 = (v) => (v == null || v === '' ? '—' : Number(v).toFixed(2));
 
+const zohoItemUrl = (id) => `https://books.zoho.com/app#/items/${id}`;
+
 /**
  * How much of an item is left, drawn rather than spelled out.
  *
- * The three stock columns already carry the figures; what they cannot show is
- * the *relationship* between them — that 12 units against a reorder point of
- * 40 is a different kind of problem from 38 against 40. The bar fills to stock
- * as a fraction of maximum capacity and carries a notch at the reorder point,
- * so how far under the line an item has fallen is legible without arithmetic.
+ * The stock columns already carry the figures; what they cannot show is the
+ * *relationship* between them — that 12 units against a reorder point of 40 is
+ * a different kind of problem from 38 against 40. The bar fills to stock as a
+ * fraction of maximum capacity and carries a notch at the reorder point, so
+ * how far under the line an item has fallen is legible without arithmetic.
  *
  * Falls back to twice the reorder level when no capacity is set, which is the
  * same assumption the ordering side already makes about a sensible full shelf.
  */
-function StockGauge({ stock, reorder, max, tone }) {
+function StockGauge({ stock, reorder, max, tone, className = '' }) {
 	const ceiling =
 		Number(max) > 0
 			? Number(max)
@@ -50,7 +54,7 @@ function StockGauge({ stock, reorder, max, tone }) {
 
 	return (
 		<div
-			className="relative h-[5px] w-full mt-1.5 rounded-full bg-line-4 overflow-hidden"
+			className={`relative h-[5px] w-full rounded-full bg-line-4 overflow-hidden ${className}`}
 			title={
 				markAt != null
 					? `${dec2(stock)} on hand · reorder at ${dec2(reorder)} · capacity ${dec2(ceiling)}`
@@ -73,7 +77,20 @@ function StockGauge({ stock, reorder, max, tone }) {
 	);
 }
 
+/** A label above its figure, for the card's detail grid. */
+const Detail = ({ label, children, className = '' }) => (
+	<div className={`min-w-0 ${className}`}>
+		<div className="text-[10.5px] font-bold text-muted tracking-[.04em] uppercase">
+			{label}
+		</div>
+		<div className="num text-[13px] text-body truncate">{children}</div>
+	</div>
+);
+
 export default function ItemRow({ item, selected, toggleSelect, style }) {
+	const isDesktop = useIsDesktop();
+	const isWide = useIsWide();
+
 	const stock = Number(item.stock_on_hand);
 	const reorder = item.reorder_level;
 	const simpleQty = simpleQuantityFor(item);
@@ -87,6 +104,88 @@ export default function ItemRow({ item, selected, toggleSelect, style }) {
 				? 'text-warn'
 				: 'text-ok';
 
+	const openInZoho = () => window.open(zohoItemUrl(item.item_id), '_blank');
+
+	/* ── Card, below lg ──────────────────────────────────────────────────────
+	   Built like Zoho's item list: the name, then the few figures that
+	   identify the row, then the quantity as the largest thing on the card
+	   because it is the reason the row is here at all. The fold-open screen
+	   has room for the fuller detail grid; the cover screen does not. */
+	if (!isDesktop) {
+		return (
+			<div
+				className={`flex items-start gap-3 px-4 py-3.5 border-b border-line-4 ${
+					selected ? 'bg-row-selected' : 'bg-surface'
+				}`}
+				style={style}>
+				{/* 44px of tappable area around an 18px box. */}
+				<button
+					onClick={() => toggleSelect?.(item.item_id)}
+					aria-label={`Select ${item.name}`}
+					className="flex items-center justify-center w-11 h-11 -m-2.5 flex-shrink-0 bg-transparent border-none cursor-pointer">
+					<Checkbox checked={selected} onChange={() => toggleSelect?.(item.item_id)} />
+				</button>
+
+				<div className="min-w-0 flex-1">
+					<div
+						onClick={openInZoho}
+						className="text-link font-bold text-[14.5px] leading-snug break-words cursor-pointer">
+						{item.name}
+					</div>
+
+					<div className="num text-[12px] text-muted-2 mt-0.5">
+						SKU: {item.sku || '—'}
+					</div>
+
+					<div
+						className={`mt-2 grid gap-x-4 gap-y-2 ${isWide ? 'grid-cols-4' : 'grid-cols-2'}`}>
+						<Detail label="Rate">{money(item.rate)}</Detail>
+						<Detail label="Reorder">{dec2(reorder)}</Detail>
+						{isWide && (
+							<>
+								<Detail label="Max capacity">
+									{dec2(item.cf_maximum_capacity)}
+								</Detail>
+								<Detail label="Unit">{item.unit || 'box'}</Detail>
+							</>
+						)}
+					</div>
+
+					<StockGauge
+						stock={stock}
+						reorder={reorder}
+						max={item.cf_maximum_capacity}
+						tone={stockColor}
+						className="mt-3"
+					/>
+
+					<div className="flex items-end justify-between gap-3 mt-2">
+						<div className="min-w-0">
+							<span className={`num text-[19px] font-black ${stockColor}`}>
+								{dec2(item.stock_on_hand)}
+							</span>
+							<span className="text-[12.5px] text-muted ml-1">
+								{item.unit || 'box'}
+							</span>
+						</div>
+
+						{simpleQty != null && (
+							<span className="flex items-center gap-1.5 flex-shrink-0">
+								<span className="text-[10.5px] font-bold text-muted tracking-[.04em] uppercase">
+									Simple qty
+								</span>
+								<span className="num inline-flex items-center justify-center min-w-[42px] px-2 py-[3px] rounded bg-brand-50 border border-brand-100 text-brand-700 font-black text-[13px]">
+									{simpleQty}
+								</span>
+							</span>
+						)}
+					</div>
+				</div>
+			</div>
+		);
+	}
+
+	/* ── Table row, lg and up ─────────────────────────────────────────────── */
 	return (
 		<div
 			className={`item-row grid px-[18px] py-[13px] border-b border-line-4 text-[13.5px] items-center ${
@@ -103,12 +202,7 @@ export default function ItemRow({ item, selected, toggleSelect, style }) {
 
 			<div className="min-w-0">
 				<span
-					onClick={() =>
-						window.open(
-							`https://books.zoho.com/app#/items/${item.item_id}`,
-							'_blank',
-						)
-					}
+					onClick={openInZoho}
 					className="group inline-flex items-start gap-1.5 text-link font-bold cursor-pointer hover:text-link-hover break-words">
 					<span className="group-hover:underline underline-offset-2">
 						{item.name}
@@ -139,8 +233,7 @@ export default function ItemRow({ item, selected, toggleSelect, style }) {
 			{/* Stock is the column the page exists for, so it gets the extra
 			    dimension: the figure, then the same figure as a filled track. */}
 			<div className="pr-2.5">
-				<div
-					className={`num text-right font-black text-[14px] ${stockColor}`}>
+				<div className={`num text-right font-black text-[14px] ${stockColor}`}>
 					{dec2(item.stock_on_hand)}
 				</div>
 				<StockGauge
@@ -148,6 +241,7 @@ export default function ItemRow({ item, selected, toggleSelect, style }) {
 					reorder={reorder}
 					max={item.cf_maximum_capacity}
 					tone={stockColor}
+					className="mt-1.5"
 				/>
 			</div>
 
@@ -161,8 +255,7 @@ export default function ItemRow({ item, selected, toggleSelect, style }) {
 
 			{/* What a Simple-mode PO would order for this item. Taken from the
 			    same helper the PO itself uses, so the column can never disagree
-			    with what actually gets raised — including its floor and its rule
-			    that an item needing nothing is not ordered at all. */}
+			    with what actually gets raised. */}
 			<div className="text-right pr-2.5">
 				{simpleQty == null ? (
 					<span className="num text-muted-2">—</span>

@@ -240,7 +240,7 @@ export default function ItemDetailsPanel({ itemId, itemName, vendorId, onClose }
 			style={{ background: 'rgb(var(--c-overlay) / 0.32)' }}
 			onClick={(e) => e.target === e.currentTarget && close()}>
 			<div
-				className="relative overflow-hidden w-[880px] max-w-full h-screen bg-surface shadow-[-12px_0_40px_rgb(var(--c-shadow)/0.30)] flex flex-col">
+				className="relative overflow-hidden w-full lg:w-[880px] h-screen bg-surface shadow-[-12px_0_40px_rgb(var(--c-shadow)/0.30)] flex flex-col">
 				{/* Header */}
 				<div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-line flex-shrink-0">
 					<div className="min-w-0">

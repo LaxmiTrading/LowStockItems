@@ -140,7 +140,7 @@ export default function CustomerPicker({
 				</button>
 
 				{open && !loading && (
-					<div className="absolute top-[42px] left-0 right-0 min-w-[320px] animate-slide-down bg-surface border border-line-2 rounded shadow-pop z-30 overflow-hidden">
+					<div className="absolute top-[42px] left-0 right-0 sm:min-w-[320px] animate-slide-down bg-surface border border-line-2 rounded shadow-pop z-30 overflow-hidden">
 						<div className="p-2">
 							<div className="flex items-center gap-2 h-9 border border-line-2 rounded px-[9px] transition-colors focus-within:border-muted-3">
 								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-muted-3">

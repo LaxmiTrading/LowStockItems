@@ -16,7 +16,7 @@ const field =
 
 function Card({ title, hint, children }) {
 	return (
-		<div className="bg-surface border border-line rounded p-5 mb-4 max-w-[760px]">
+		<div className="bg-surface border border-line rounded p-4 sm:p-5 mb-4 max-w-[760px]">
 			<div className="text-[14px] font-black text-heading">{title}</div>
 			{hint && (
 				<p className="text-[12.5px] text-muted-2 mt-1 mb-4 leading-relaxed">
@@ -69,7 +69,7 @@ function AppearanceCard() {
 			<div
 				role="radiogroup"
 				aria-label="Colour theme"
-				className="inline-flex bg-surface-2 border border-line rounded p-[3px] gap-[3px]">
+				className="flex sm:inline-flex bg-surface-2 border border-line rounded p-[3px] gap-[3px]">
 				{THEME_OPTIONS.map((option) => {
 					const active = preference === option.id;
 					return (
@@ -184,8 +184,8 @@ export default function SettingsPage() {
 	};
 
 	return (
-		<div className="px-7 pt-6 pb-16 max-w-[1400px]">
-			<h1 className="text-[23px] font-black text-heading tracking-[-.02em] m-0">
+		<div className="px-4 sm:px-6 lg:px-7 pt-5 lg:pt-6 pb-16 max-w-[1400px]">
+			<h1 className="text-[20px] lg:text-[23px] font-black text-heading tracking-[-.02em] m-0">
 				Settings
 			</h1>
 			<p className="text-[13px] text-muted-2 m-0 mt-1 mb-5">
@@ -204,7 +204,7 @@ export default function SettingsPage() {
 					<div className="skeleton h-4 w-1/3" />
 				) : (
 					<>
-						<dl className="grid grid-cols-[160px_minmax(0,1fr)] gap-y-2 text-[13px] m-0 mb-4">
+						<dl className="grid grid-cols-1 sm:grid-cols-[160px_minmax(0,1fr)] gap-y-1 sm:gap-y-2 text-[13px] m-0 mb-4">
 							<dt className="text-muted">Status</dt>
 							<dd className="m-0 font-bold">
 								{zoho.connected ? (
@@ -338,7 +338,7 @@ export default function SettingsPage() {
 					)}
 
 					<div className="border border-line rounded overflow-hidden">
-						<div className="grid grid-cols-[minmax(0,2fr)_minmax(0,2fr)_110px_110px] px-3.5 py-2 bg-surface-2 border-b border-line text-[10.5px] font-black text-muted tracking-[.06em]">
+						<div className="hidden sm:grid grid-cols-[minmax(0,2fr)_minmax(0,2fr)_110px_110px] px-3.5 py-2 bg-surface-2 border-b border-line text-[10.5px] font-black text-muted tracking-[.06em]">
 							<div>NAME</div>
 							<div>EMAIL</div>
 							<div>ROLE</div>
@@ -347,7 +347,7 @@ export default function SettingsPage() {
 						{users.map((u) => (
 							<div
 								key={u.id}
-								className="grid grid-cols-[minmax(0,2fr)_minmax(0,2fr)_110px_110px] px-3.5 py-2.5 border-b border-line-4 last:border-0 text-[13px] items-center">
+								className="grid grid-cols-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_110px_110px] gap-x-3 gap-y-1 px-3.5 py-2.5 border-b border-line-4 last:border-0 text-[13px] sm:items-center">
 								<div className="font-bold text-body truncate">
 									{u.displayName}
 								</div>

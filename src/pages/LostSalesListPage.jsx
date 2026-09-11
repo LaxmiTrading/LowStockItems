@@ -5,6 +5,7 @@ import { listLostSales, deleteLostSale } from '../lib/lostSales';
 import Pagination from '../components/Pagination';
 import ConfirmDialog from '../components/ConfirmDialog';
 import MetricCard from '../components/MetricCard';
+import { useIsDesktop } from '../lib/useMediaQuery';
 
 const COLS = '120px minmax(0,1.4fr) minmax(0,2.6fr) 110px 80px';
 
@@ -74,6 +75,7 @@ const initialsFor = (name) => {
 };
 
 export default function LostSalesListPage() {
+	const isDesktop = useIsDesktop();
 	const navigate = useNavigate();
 	const location = useLocation();
 
@@ -174,11 +176,11 @@ export default function LostSalesListPage() {
 	};
 
 	return (
-		<div className="px-7 pt-6 pb-[70px] max-w-[1400px]">
+		<div className="px-4 sm:px-6 lg:px-7 pt-5 lg:pt-6 pb-[70px] max-w-[1400px]">
 			{/* Title row */}
 			<div className="flex items-end gap-3 mb-5 flex-wrap">
 				<div className="min-w-0">
-					<h1 className="text-[23px] font-black text-heading tracking-[-.02em] m-0">
+					<h1 className="text-[20px] lg:text-[23px] font-black text-heading tracking-[-.02em] m-0">
 						Lost sales
 					</h1>
 					<p className="text-[13px] text-muted-2 m-0 mt-1">
@@ -189,7 +191,7 @@ export default function LostSalesListPage() {
 				<div className="flex-1" />
 				<button
 					onClick={() => navigate('/lost-sales/new')}
-					className="h-9 px-[15px] rounded border border-brand bg-brand hover:bg-brand-600 text-white font-bold text-[13px] cursor-pointer flex items-center gap-1.5 transition-all duration-200 ease-smooth">
+					className="h-10 sm:h-9 w-full sm:w-auto px-[15px] rounded border border-brand bg-brand hover:bg-brand-600 text-white font-bold text-[13px] cursor-pointer flex items-center justify-center gap-1.5 transition-all duration-200 ease-smooth">
 					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.6">
 						<path d="M12 5v14M5 12h14" strokeLinecap="round" />
 					</svg>
@@ -201,7 +203,7 @@ export default function LostSalesListPage() {
 			    in a sentence, given the weight the low-stock list gives its own.
 			    Units is accented because it is the one that feeds the reorder
 			    engine; the other two only describe the log. */}
-			<div className="flex gap-4 mb-4 flex-wrap">
+			<div className="grid grid-cols-2 sm:grid-cols-3 gap-3 lg:gap-4 mb-4 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
 				<MetricCard
 					label="Records"
 					value={filtered.length}
@@ -265,7 +267,7 @@ export default function LostSalesListPage() {
 
 			{/* Toolbar */}
 			<div className="flex items-center gap-2.5 mb-3.5 flex-wrap">
-				<div className="group flex items-center gap-2 border border-line-2 rounded bg-surface px-[11px] h-9 w-72 max-w-full transition-colors focus-within:border-muted-3">
+				<div className="group flex items-center gap-2 border border-line-2 rounded bg-surface px-[11px] h-10 lg:h-9 w-full lg:w-72 transition-colors focus-within:border-muted-3">
 					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-muted-3 transition-colors group-focus-within:text-brand">
 						<circle cx="11" cy="11" r="7" />
 						<path d="M21 21l-4-4" strokeLinecap="round" />
@@ -288,7 +290,7 @@ export default function LostSalesListPage() {
 							✕
 						</button>
 					) : (
-						<kbd className="flex-shrink-0 text-[10px] font-bold text-muted-3 border border-line-2 rounded px-1.5 py-px bg-surface-2 select-none">
+						<kbd className="hidden lg:block flex-shrink-0 text-[10px] font-bold text-muted-3 border border-line-2 rounded px-1.5 py-px bg-surface-2 select-none">
 							/
 						</kbd>
 					)}
@@ -307,7 +309,7 @@ export default function LostSalesListPage() {
 			{/* Table */}
 			<div className="bg-surface border border-line rounded overflow-hidden">
 				<div
-					className="grid px-[18px] py-3 bg-surface-2 border-b border-line text-[10.5px] font-black text-muted tracking-[.06em] items-center"
+					className="hidden lg:grid px-[18px] py-3 bg-surface-2 border-b border-line text-[10.5px] font-black text-muted tracking-[.06em] items-center"
 					style={{ gridTemplateColumns: COLS }}>
 					<div>DATE</div>
 					<div>CUSTOMER</div>
@@ -316,7 +318,17 @@ export default function LostSalesListPage() {
 					<div className="text-right">ACTIONS</div>
 				</div>
 
-				{loading ? (
+				{loading && !isDesktop ? (
+					<div>
+						{Array.from({ length: 5 }, (_, i) => (
+							<div key={i} className="px-4 py-3.5 border-b border-line-4">
+								<div className="skeleton h-3 w-20" />
+								<div className="skeleton h-4 mt-2" style={{ width: `${45 + ((i * 13) % 35)}%` }} />
+								<div className="skeleton h-3 w-2/3 mt-2" />
+							</div>
+						))}
+					</div>
+				) : loading ? (
 					<div className="px-[18px] py-2">
 						{Array.from({ length: 5 }, (_, i) => (
 							<div
@@ -367,10 +379,28 @@ export default function LostSalesListPage() {
 						</button>
 					</div>
 				) : (
-					<div className="stagger">
+					<div className={`stagger ${isDesktop ? '' : 'sm:grid sm:grid-cols-2'}`}>
 						{visible.map((r, i) => {
 							const rel = relativeDay(r.date);
 							const name = r.customer_name || 'Unnamed customer';
+
+							if (!isDesktop) {
+								return (
+									<LostSaleCard
+										key={r.id}
+										record={r}
+										relative={rel}
+										name={name}
+										index={i}
+										onEdit={() =>
+											navigate(`/lost-sales/${r.id}/edit`, { state: { record: r } })
+										}
+										onDelete={() => setPendingDelete(r)}
+										deleting={deletingId === r.id}
+									/>
+								);
+							}
+
 							return (
 								<div
 									key={r.id}
@@ -563,6 +593,103 @@ function ItemsCell({ record }) {
 					</span>
 				)
 			)}
+		</div>
+	);
+}
+
+
+/**
+ * One lost sale, as a card.
+ *
+ * The five table columns do not survive a 360px screen, so the record is
+ * restacked by importance: when it happened, who asked, what they wanted, and
+ * how many. The controls are always visible here — the hover reveal the table
+ * uses has nothing to reveal it with on a touch screen.
+ */
+function LostSaleCard({
+	record,
+	relative,
+	name,
+	index,
+	onEdit,
+	onDelete,
+	deleting,
+}) {
+	const items = itemsOf(record);
+	const total = qtyTotal(record);
+
+	return (
+		<div
+			className="px-4 py-3.5 border-b border-line-4 bg-surface sm:border sm:border-line sm:rounded sm:m-1.5"
+			style={{ '--i': Math.min(index, 20) }}>
+			<div className="flex items-start gap-2.5">
+				<span
+					className={`w-9 h-9 rounded flex items-center justify-center text-[12px] font-black flex-shrink-0 ${tintFor(name)}`}>
+					{initialsFor(name)}
+				</span>
+
+				<div className="min-w-0 flex-1">
+					<div className="text-[14.5px] font-bold text-body truncate">
+						{record.customer_name || (
+							<span className="text-muted-2 font-normal italic">Unnamed</span>
+						)}
+					</div>
+					<div className="text-[12px] mt-0.5">
+						{relative ? (
+							<span className="font-black text-brand-600">{relative}</span>
+						) : (
+							<span className="num text-muted-2">{fmtDate(record.date)}</span>
+						)}
+					</div>
+				</div>
+
+				{total != null && (
+					<span className="num inline-flex items-center justify-center min-w-[38px] px-2 py-[3px] rounded bg-surface-2 border border-line text-body font-black text-[13px] flex-shrink-0">
+						{total}
+					</span>
+				)}
+			</div>
+
+			<div className="mt-2.5 text-[13px] text-body-2">
+				{items.length === 0 ? (
+					<span className="text-muted-2">No items recorded</span>
+				) : (
+					<ul className="list-none p-0 m-0 flex flex-col gap-1">
+						{items.map((it, n) => (
+							<li key={n} className="flex items-baseline justify-between gap-3">
+								<span className="truncate">{it.item_name || '—'}</span>
+								<span className="num flex-shrink-0 text-muted-2">
+									{it.qty_wanted == null ? '—' : it.qty_wanted}
+								</span>
+							</li>
+						))}
+					</ul>
+				)}
+			</div>
+
+			<div className="flex items-center gap-2 mt-3">
+				<button
+					onClick={onEdit}
+					className="flex-1 h-9 rounded border border-line-2 bg-surface text-body-2 font-bold text-[12.5px] cursor-pointer flex items-center justify-center gap-1.5">
+					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+						<path d="M12 20h9" />
+						<path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+					</svg>
+					Edit
+				</button>
+				<button
+					onClick={onDelete}
+					disabled={deleting}
+					className="h-9 w-11 rounded border border-line-2 bg-surface text-body-3 cursor-pointer flex items-center justify-center disabled:opacity-40"
+					aria-label="Delete this record">
+					<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+						<path d="M3 6h18" />
+						<path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+						<path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6" />
+						<path d="M10 11v6M14 11v6" />
+					</svg>
+				</button>
+			</div>
 		</div>
 	);
 }

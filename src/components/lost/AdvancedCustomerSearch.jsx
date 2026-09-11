@@ -67,7 +67,7 @@ export default function AdvancedCustomerSearch({
 
 	return (
 		<div
-			className="fixed inset-0 z-[90] flex items-center justify-center p-8"
+			className="fixed inset-0 z-[90] flex items-center justify-center p-0 sm:p-8"
 			style={{ background: 'rgb(var(--c-overlay) / 0.42)' }}
 			onClick={(e) => e.target === e.currentTarget && onClose()}>
 			<div className="w-[900px] max-w-full max-h-[86vh] bg-surface rounded shadow-float flex flex-col overflow-hidden">

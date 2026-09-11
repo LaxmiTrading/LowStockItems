@@ -30,7 +30,7 @@ export default function Pagination({
 	const last = Math.min((safePage + 1) * pageSize, total);
 
 	return (
-		<div className="flex items-center justify-end gap-2.5 flex-wrap">
+		<div className="flex items-center justify-between sm:justify-end gap-2.5 flex-wrap">
 			{/* Per-page selector */}
 			<div ref={wrapRef} className="relative">
 				<button

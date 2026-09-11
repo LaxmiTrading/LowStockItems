@@ -19,6 +19,14 @@
    browser's own canvas follow along. */
 :root {
 	color-scheme: light;
+
+	/* Width of the navigation rail, published by AppShell. The two full-page
+	   forms and the low-stock selection bar are `fixed`, so they cannot be laid
+	   out beside the sidebar and have to be told how wide it is. It has three
+	   values now — 0 on a phone, 60 collapsed, 236 expanded — so a magic number
+	   copied into three files would have been wrong in two of them.
+	   This default covers the first paint, before AppShell's effect runs. */
+	--nav-w: 0px;
 	--c-app: 238 241 245;
 	--c-surface: 255 255 255;
 	--c-surface-2: 246 247 249;
@@ -473,4 +481,18 @@ code {
 		transition-duration: 0.01ms !important;
 		scroll-behavior: auto !important;
 	}
+}
+
+/* The drawer comes in from the edge it is docked to. */
+@keyframes drawerIn {
+	from {
+		transform: translateX(-100%);
+	}
+	to {
+		transform: translateX(0);
+	}
+}
+
+.drawer-in {
+	animation: drawerIn 0.2s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }

@@ -9,15 +9,16 @@ export default function Field({
 	hint,
 	error,
 }) {
+	// Stacked until lg. A 180px label column beside a 420px control needs
+	// 600px of width before it is anything but a squeeze, and a phone has half
+	// that.
 	return (
 		<div
-			className="grid gap-6"
-			style={{
-				gridTemplateColumns: '180px minmax(0,420px)',
-				alignItems: align === 'start' ? 'start' : 'center',
-			}}>
+			className={`flex flex-col gap-1.5 lg:grid lg:gap-6 lg:grid-cols-[180px_minmax(0,420px)] ${
+				align === 'start' ? 'lg:items-start' : 'lg:items-center'
+			}`}>
 			<label
-				className={`text-[13.5px] font-bold text-body-2 ${align === 'start' ? 'pt-2' : ''}`}>
+				className={`text-[13.5px] font-bold text-body-2 ${align === 'start' ? 'lg:pt-2' : ''}`}>
 				{label}
 				{required && <span className="text-danger ml-0.5">*</span>}
 			</label>

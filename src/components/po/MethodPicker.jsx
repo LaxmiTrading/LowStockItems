@@ -459,7 +459,7 @@ export default function MethodPicker({ lines, onApply }) {
 
 			{/* Preview — a full-width band, so the result table gets the whole page
 			    rather than the narrow control column. */}
-			<div className="-mx-8 mt-1 px-8 py-[18px] border-y border-line bg-sidebar">
+			<div className="-mx-4 sm:-mx-8 mt-1 px-4 sm:px-8 py-[18px] border-y border-line bg-sidebar">
 				<div className="flex items-start justify-between gap-4 flex-wrap">
 					<div className="min-w-0">
 						<div className="text-[13.5px] font-black text-heading">
@@ -484,7 +484,7 @@ export default function MethodPicker({ lines, onApply }) {
 						<button
 							onClick={runPreview}
 							disabled={!isValid || busy || allocatable.length === 0}
-							className="h-[38px] px-4 rounded border border-line-2 bg-surface text-body-2 font-bold text-[13px] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:border-brand-300 hover:text-brand-600 flex items-center gap-2 transition-all duration-200 ease-smooth">
+							className="h-10 sm:h-[38px] flex-1 sm:flex-none px-4 rounded border border-line-2 bg-surface text-body-2 font-bold text-[13px] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:border-brand-300 hover:text-brand-600 flex items-center justify-center gap-2 transition-all duration-200 ease-smooth">
 							{busy && (
 								<span className="w-3.5 h-3.5 border-2 border-muted-4 border-t-body-3 rounded-full animate-spin" />
 							)}
@@ -498,7 +498,7 @@ export default function MethodPicker({ lines, onApply }) {
 						{preview && !compare && (
 							<button
 								onClick={() => apply(preview.methods[0])}
-								className="h-[38px] px-4 rounded border border-brand bg-brand hover:bg-brand-600 text-white font-bold text-[13px] cursor-pointer transition-all duration-200 ease-smooth animate-pop-in">
+								className="h-10 sm:h-[38px] flex-1 sm:flex-none px-4 rounded border border-brand bg-brand hover:bg-brand-600 text-white font-bold text-[13px] cursor-pointer transition-all duration-200 ease-smooth animate-pop-in">
 								Use these quantities
 							</button>
 						)}
@@ -544,7 +544,7 @@ export default function MethodPicker({ lines, onApply }) {
 							)}
 						</div>
 
-						<div className="max-h-[320px] overflow-auto">
+						<div className="max-h-[320px] overflow-auto [&>*]:min-w-[560px]">
 							<div
 								style={{ gridTemplateColumns: gridCols }}
 								className="grid bg-surface-2 border-b border-line text-[10px] font-black text-muted tracking-[.06em] sticky top-0 z-10">

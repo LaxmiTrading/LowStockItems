@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import ItemPicker from './ItemPicker';
 import ItemDetailsPanel from './ItemDetailsPanel';
+import { useIsDesktop } from '../../lib/useMediaQuery';
 
 const money = (v) =>
 	'₹' +
@@ -37,6 +38,8 @@ export default function POItemTable({
 		? 'minmax(0,2.1fr) minmax(0,0.8fr) minmax(0,0.9fr) minmax(0,0.85fr) minmax(0,0.85fr) minmax(0,1fr)'
 		: 'minmax(0,2.1fr) minmax(0,0.8fr) minmax(0,0.9fr) minmax(0,0.85fr)';
 
+	const isDesktop = useIsDesktop();
+
 	// Opened from a row's overflow menu; rendered here because it covers the page.
 	const [detailsFor, setDetailsFor] = useState(null);
 
@@ -62,7 +65,7 @@ export default function POItemTable({
 
 	return (
 		<div>
-		<div className="bg-surface border border-line rounded overflow-visible mr-[86px]">
+		<div className="bg-surface border border-line rounded overflow-visible mr-0 lg:mr-[86px]">
 			<div className="flex items-center justify-between px-[18px] py-[13px] bg-surface-2 border-b border-line rounded-t">
 				<div className="font-black text-[14px] text-heading">Item Table</div>
 				<div className="num text-[12.5px] font-bold text-body-3">
@@ -73,7 +76,7 @@ export default function POItemTable({
 
 			{/* Header */}
 			<div
-				className="grid bg-surface-2 border-b border-line text-[10.5px] font-black text-muted tracking-[.06em]"
+				className="hidden lg:grid bg-surface-2 border-b border-line text-[10.5px] font-black text-muted tracking-[.06em]"
 				style={{ gridTemplateColumns: cols }}>
 				<div className="px-3.5 py-2.5 border-r border-line min-w-0">ITEM DETAILS</div>
 				<div className="px-3.5 py-2.5 border-r border-line text-right min-w-0">
@@ -99,6 +102,7 @@ export default function POItemTable({
 			{lines.map((line) => (
 				<POLineRow
 					key={line.key}
+					isDesktop={isDesktop}
 					line={line}
 					cols={cols}
 					showRate={showRate}
@@ -125,7 +129,7 @@ export default function POItemTable({
 
 		{/* Outside the table: the action is not a row, and the running total
 		    belongs beneath the column it totals. */}
-		<div className="mr-[86px] mt-3 flex items-center justify-between gap-3 flex-wrap">
+		<div className="mr-0 lg:mr-[86px] mt-3 flex items-center justify-between gap-3 flex-wrap">
 			<button
 				onClick={onOpenBulk}
 				className="flex items-center gap-[7px] h-9 px-3.5 rounded border border-brand-200 bg-brand-50 text-brand-600 font-bold text-[13px] cursor-pointer hover:bg-brand-100 hover:border-brand-300 transition-all duration-200 ease-smooth">
@@ -148,6 +152,7 @@ export default function POItemTable({
 }
 
 function POLineRow({
+	isDesktop,
 	line,
 	cols,
 	showRate,
@@ -170,6 +175,136 @@ function POLineRow({
 
 	const overMax =
 		!line.isFreeText && !isNaN(maxCap) && maxCap > 0 && onHand + qty > maxCap;
+
+	/* Below lg the six columns become a stacked card. The two controls that
+	   lived in the table's right-hand gutter move inline: there is no gutter to
+	   put them in, and a 28px button in one would be unhittable anyway. */
+	if (!isDesktop) {
+		const filled = line.item_id || line.isFreeText;
+		return (
+			<div className="px-4 py-3.5 border-b border-line bg-surface">
+				{filled ? (
+					<>
+						<div className="flex items-start gap-2">
+							<div className="min-w-0 flex-1">
+								<div className="flex items-center gap-[7px] flex-wrap">
+									<span className="font-black text-[14px] text-heading">
+										{line.name}
+									</span>
+									{line.isFreeText && (
+										<span className="text-[10px] font-black text-warn-2 bg-warn-bg border border-warn-border rounded-full px-2 py-px">
+											new
+										</span>
+									)}
+								</div>
+								{line.isFreeText ? (
+									<div className="text-[11.5px] text-warn-2 mt-1 leading-[1.35]">
+										Free-text item — kept on the PO but excluded from every
+										quantity allocation method.
+									</div>
+								) : (
+									<div className="text-[11.5px] text-muted-2 mt-0.5">
+										SKU: {line.sku || '—'} · {money(line.purchase_rate)}
+									</div>
+								)}
+							</div>
+
+							<div className="flex items-center gap-1.5 flex-shrink-0">
+								{line.item_id && (
+									<button
+										onClick={() => onViewDetails(line)}
+										aria-label={`View details for ${line.name || 'this line'}`}
+										className="no-press w-9 h-9 rounded border border-line-2 bg-surface flex items-center justify-center cursor-pointer text-body-3">
+										<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+											<path d="M4 4h12l4 4v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
+											<path d="M8 12h8M8 16h5" />
+										</svg>
+									</button>
+								)}
+								<button
+									onClick={() => onRemoveLine(line.key)}
+									aria-label={`Remove ${line.name || 'this line'}`}
+									className="no-press w-9 h-9 rounded border border-line-2 bg-surface flex items-center justify-center cursor-pointer text-body-3">
+									<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+										<path d="M3 6h18" />
+										<path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+										<path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6" />
+										<path d="M10 11v6M14 11v6" />
+									</svg>
+								</button>
+							</div>
+						</div>
+
+						<div className="flex items-center gap-4 mt-2.5 text-[12.5px]">
+							<span className="text-muted">
+								On hand{' '}
+								<span className={`num font-bold ${onHand > 0 ? 'text-ok' : 'text-danger'}`}>
+									{line.isFreeText ? '—' : onHand}
+								</span>
+							</span>
+							<span className="text-muted">
+								Max{' '}
+								<span className={`num font-bold ${overMax ? 'text-warn' : 'text-body-3'}`}>
+									{line.isFreeText || isNaN(maxCap) ? '—' : maxCap}
+								</span>
+							</span>
+						</div>
+
+						<div className="flex items-end gap-2.5 mt-3">
+							<label className="flex-1 min-w-0">
+								<span className="block text-[11px] font-bold text-muted tracking-[.04em] uppercase mb-1">
+									Quantity
+								</span>
+								<input
+									type="number"
+									min="0"
+									inputMode="decimal"
+									value={line.quantity}
+									onChange={(e) => set({ quantity: e.target.value })}
+									className="num w-full h-10 border border-line-2 rounded px-2.5 text-right text-[14px] font-bold outline-none bg-surface transition-colors focus:border-muted-3"
+								/>
+							</label>
+
+							{showRate && (
+								<>
+									<label className="flex-1 min-w-0">
+										<span className="block text-[11px] font-bold text-muted tracking-[.04em] uppercase mb-1">
+											Rate
+										</span>
+										<input
+											type="number"
+											min="0"
+											step="0.01"
+											inputMode="decimal"
+											value={line.poRate}
+											onChange={(e) => set({ poRate: e.target.value })}
+											placeholder="0.00"
+											className="num w-full h-10 border border-line-2 rounded px-2.5 text-right text-[14px] outline-none bg-surface transition-colors focus:border-muted-3"
+										/>
+									</label>
+									<div className="flex-1 min-w-0 text-right">
+										<span className="block text-[11px] font-bold text-muted tracking-[.04em] uppercase mb-1">
+											Amount
+										</span>
+										<span className="num block h-10 leading-10 text-[14px] font-black text-body truncate">
+											{money(amount)}
+										</span>
+									</div>
+								</>
+							)}
+						</div>
+					</>
+				) : (
+					<ItemPicker
+						items={allItems}
+						loading={itemsLoading}
+						error={itemsError}
+						onPick={(item) => onPickItem(line.key, item)}
+					/>
+				)}
+			</div>
+		);
+	}
 
 	// items-stretch, not items-start: a cell sized to its own content leaves the
 	// vertical border-r short of the row height whenever a sibling cell is taller

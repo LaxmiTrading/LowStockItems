@@ -342,7 +342,7 @@ export default function TransactionDocument({ type, docId, number, onBack }) {
 								)}
 							</div>
 
-							<div className="w-[320px] max-w-full bg-surface border border-line rounded px-4 py-3">
+							<div className="w-full sm:w-[320px] max-w-full bg-surface border border-line rounded px-4 py-3">
 								<Total
 									label={
 										doc?.is_inclusive_tax ? 'Sub Total (tax inclusive)' : 'Sub Total'

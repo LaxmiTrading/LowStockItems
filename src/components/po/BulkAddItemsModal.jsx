@@ -79,10 +79,10 @@ export default function BulkAddItemsModal({
 
 	return (
 		<div
-			className="fixed inset-0 z-[80] flex items-center justify-center p-[30px] animate-fade-in"
+			className="fixed inset-0 z-[80] flex items-center justify-center p-0 sm:p-[30px] animate-fade-in"
 			style={{ background: 'rgb(var(--c-overlay) / 0.42)' }}
 			onClick={(e) => e.target === e.currentTarget && onClose()}>
-			<div className="animate-pop-in w-[1000px] max-w-full h-[620px] max-h-[92vh] bg-surface rounded shadow-float flex flex-col overflow-hidden">
+			<div className="animate-pop-in w-full sm:w-[1000px] sm:max-w-full h-full sm:h-[620px] sm:max-h-[92vh] bg-surface sm:rounded shadow-float flex flex-col overflow-hidden">
 				{/* Header */}
 				<div className="flex items-center justify-between px-5 py-[15px] bg-surface-2 border-b border-line">
 					<div className="text-[16px] font-black text-heading tracking-[-.01em]">
@@ -97,9 +97,9 @@ export default function BulkAddItemsModal({
 					</button>
 				</div>
 
-				<div className="flex-1 flex min-h-0">
+				<div className="flex-1 flex flex-col lg:flex-row min-h-0">
 					{/* Left — catalogue */}
-					<div className="w-1/2 border-r border-line-3 flex flex-col min-h-0">
+					<div className="flex-1 lg:w-1/2 lg:flex-none border-b lg:border-b-0 lg:border-r border-line-3 flex flex-col min-h-0">
 						<div className="px-4 py-3.5">
 							<div className="flex items-center gap-2 border border-line-2 rounded px-[11px] py-[9px] transition-colors focus-within:border-muted-3">
 								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-muted-3">
@@ -187,7 +187,7 @@ export default function BulkAddItemsModal({
 					</div>
 
 					{/* Right — selection */}
-					<div className="w-1/2 flex flex-col min-h-0">
+					<div className="flex-1 lg:w-1/2 lg:flex-none flex flex-col min-h-0">
 						<div className="flex items-center justify-between px-5 pt-4 pb-3">
 							<div className="flex items-center gap-2.5">
 								<span className="text-[17px] font-black text-heading tracking-[-.01em]">

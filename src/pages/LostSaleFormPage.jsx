@@ -295,9 +295,9 @@ export default function LostSaleFormPage() {
 	};
 
 	return (
-		<div className="fixed top-[52px] left-[236px] right-0 bottom-0 z-[70] bg-surface flex flex-col">
+		<div className="fixed top-[52px] left-[var(--nav-w)] right-0 bottom-0 z-[70] bg-surface flex flex-col">
 			{/* Header */}
-			<div className="h-16 flex-shrink-0 bg-surface border-b border-line flex items-center justify-between gap-3 px-6">
+			<div className="h-14 sm:h-16 flex-shrink-0 bg-surface border-b border-line flex items-center justify-between gap-2 px-3 sm:px-6">
 				<div className="flex items-center gap-3 min-w-0">
 					<button
 						onClick={() => navigate('/lost-sales')}
@@ -309,7 +309,7 @@ export default function LostSaleFormPage() {
 						</svg>
 					</button>
 					<div className="flex items-center gap-2.5 min-w-0">
-					<h1 className="text-[21px] text-heading font-black tracking-[-.02em] truncate m-0">
+					<h1 className="text-[17px] sm:text-[21px] text-heading font-black tracking-[-.02em] truncate m-0">
 						{isEditing ? 'Edit lost sale' : 'Record a lost sale'}
 					</h1>
 					{filledRows.length > 0 && (
@@ -334,7 +334,7 @@ export default function LostSaleFormPage() {
 			{/* Body */}
 			<div className="flex-1 overflow-y-auto overflow-x-hidden">
 				{loadingRecord && (
-					<div className="px-8 pt-5">
+					<div className="px-4 sm:px-8 pt-5">
 						<div className="px-4 py-3 text-[13px] text-body-3 bg-surface-2 border border-line rounded flex items-center gap-2.5">
 							<span className="relative flex w-2 h-2 flex-shrink-0">
 								<span className="absolute inset-0 rounded-full bg-brand animate-halo" />
@@ -346,7 +346,7 @@ export default function LostSaleFormPage() {
 				)}
 
 				{result && (
-					<div className="px-8 pt-5">
+					<div className="px-4 sm:px-8 pt-5">
 						<div className="animate-slide-up-in flex items-center justify-between px-4 py-3 text-[13px] font-bold rounded border bg-danger-bg border-danger-border text-danger">
 							<span>{result.message}</span>
 							<button
@@ -359,7 +359,7 @@ export default function LostSaleFormPage() {
 				)}
 
 				{/* Customer sits on the tinted band, as the vendor does on the PO page */}
-				<div className="bg-sidebar border-b border-line px-8 py-6">
+				<div className="bg-sidebar border-b border-line px-4 sm:px-8 py-5 sm:py-6">
 					<Field label="Customer" required align="start" error={errors.customer}>
 						<CustomerPicker
 							customers={customers}
@@ -378,7 +378,7 @@ export default function LostSaleFormPage() {
 				</div>
 
 				{/* Date */}
-				<div className="px-8 py-6 flex flex-col gap-5">
+				<div className="px-4 sm:px-8 py-5 sm:py-6 flex flex-col gap-5">
 					<Field label="Date" required error={errors.date}>
 						<DatePicker
 							value={date}
@@ -394,8 +394,8 @@ export default function LostSaleFormPage() {
 
 				{/* Item table — the PO page's table, column for column, so the two
 				    forms read as one product. */}
-				<div className="px-8 pb-6">
-					<div className="bg-surface border border-line rounded overflow-visible mr-12">
+				<div className="px-4 sm:px-8 pb-6">
+					<div className="bg-surface border border-line rounded overflow-visible mr-0 lg:mr-12">
 						<div className="flex items-center justify-between gap-3 px-[18px] py-[13px] bg-surface-2 border-b border-line rounded-t">
 							<div className="font-black text-[14px] text-heading">Item Table</div>
 							{errors.items ? (
@@ -408,7 +408,7 @@ export default function LostSaleFormPage() {
 						</div>
 
 						<div
-							className="grid bg-surface-2 border-b border-line text-[10.5px] font-black text-muted tracking-[.06em]"
+							className="hidden lg:grid bg-surface-2 border-b border-line text-[10.5px] font-black text-muted tracking-[.06em]"
 							style={{ gridTemplateColumns: ITEM_COLS }}>
 							<div className="px-3.5 py-2.5 border-r border-line min-w-0">
 								ITEM DETAILS
@@ -429,9 +429,9 @@ export default function LostSaleFormPage() {
 							return (
 							<div
 								key={r.key}
-								className="group grid border-b border-line items-stretch relative bg-surface hover:bg-brand-50/40 transition-colors duration-150"
+								className="group flex flex-col lg:grid border-b border-line lg:items-stretch relative bg-surface hover:bg-brand-50/40 transition-colors duration-150"
 								style={{ gridTemplateColumns: ITEM_COLS }}>
-								<div className="px-3.5 py-3 border-r border-line min-w-0">
+								<div className="px-3.5 py-3 lg:border-r border-line min-w-0">
 									{isFilled(r) ? (
 										<div className="pl-2.5">
 											<div className="flex items-center gap-[7px] flex-wrap">
@@ -469,7 +469,7 @@ export default function LostSaleFormPage() {
 								{/* Stock at the moment of logging — the same colour rule the
 								    PO table uses, so an out-of-stock line reads the same way
 								    on both pages. */}
-								<div className="num px-3.5 py-3 border-r border-line text-right text-[13.5px] min-w-0">
+								<div className="num px-3.5 pb-3 lg:py-3 lg:border-r border-line text-left lg:text-right text-[13.5px] min-w-0">
 									{!isFilled(r) || r.isFreeText ? (
 										<span className="text-muted-2">—</span>
 									) : (
@@ -520,7 +520,7 @@ export default function LostSaleFormPage() {
 					{/* Kept quiet, and nudged in from the edge so it sits under the
 					    quantity column rather than the table's outer rule — the same
 					    placement the PO page gives its running total. */}
-					<div className="mr-12 mt-3 flex justify-end">
+					<div className="mr-0 lg:mr-12 mt-3 flex justify-end">
 						<div className="text-[12.5px] text-muted pr-6">
 							Total Quantity{' '}
 							<span className="num font-black text-body-2 ml-1">
@@ -532,11 +532,11 @@ export default function LostSaleFormPage() {
 			</div>
 
 			{/* Footer */}
-			<div className="flex-shrink-0 bg-surface border-t border-line flex items-center gap-3 px-6 py-3">
+			<div className="flex-shrink-0 bg-surface border-t border-line flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-3">
 				<button
 					onClick={handleSave}
 					disabled={saving}
-					className="h-[34px] px-4 rounded border border-brand bg-brand hover:bg-brand-600 text-white font-bold text-[13px] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 transition-all duration-200 ease-smooth">
+					className="h-10 sm:h-[34px] flex-1 sm:flex-none px-4 rounded border border-brand bg-brand hover:bg-brand-600 text-white font-bold text-[13px] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all duration-200 ease-smooth">
 					{saving && (
 						<span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
 					)}
@@ -545,7 +545,7 @@ export default function LostSaleFormPage() {
 				<button
 					onClick={() => navigate('/lost-sales')}
 					disabled={saving}
-					className="h-[34px] px-4 rounded border border-line-2 bg-surface text-body-2 font-bold text-[13px] cursor-pointer disabled:opacity-50 hover:bg-surface-2 hover:border-muted-4">
+					className="h-10 sm:h-[34px] px-4 rounded border border-line-2 bg-surface text-body-2 font-bold text-[13px] cursor-pointer disabled:opacity-50 hover:bg-surface-2 hover:border-muted-4">
 					Cancel
 				</button>
 
@@ -554,7 +554,7 @@ export default function LostSaleFormPage() {
 				{/* The figures the save is about, kept beside the button that
 				    performs it — the same placement the PO footer uses. */}
 				{filledRows.length > 0 && (
-					<div className="flex items-baseline gap-2.5 pr-1">
+					<div className="hidden sm:flex items-baseline gap-2.5 pr-1">
 						<span className="text-[12px] text-muted font-bold">
 							{filledRows.length} item{filledRows.length !== 1 ? 's' : ''}
 						</span>
