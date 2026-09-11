@@ -496,3 +496,16 @@ code {
 .drawer-in {
 	animation: drawerIn 0.2s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
+
+/* Full height of what you can actually see.
+
+   100vh on a mobile browser is the height with the address bar retracted, so
+   a 100vh panel always hangs some way below the visible viewport and its last
+   rows cannot be reached however hard you scroll. 100dvh tracks the visible
+   area as the toolbars come and go. The 100vh line stays as the fallback for
+   browsers without dvh — order matters, the later declaration wins where it
+   is understood. */
+.h-dvh {
+	height: 100vh;
+	height: 100dvh;
+}

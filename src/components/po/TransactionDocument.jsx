@@ -203,7 +203,7 @@ export default function TransactionDocument({ type, docId, number, onBack }) {
 				</div>
 			</div>
 
-			<div className="flex-1 overflow-y-auto bg-sidebar px-5 py-5">
+			<div className="flex-1 min-h-0 overflow-y-auto bg-sidebar px-4 sm:px-5 py-5">
 				{loading ? (
 					<p className="text-[13px] text-muted-2 text-center py-16">Loading…</p>
 				) : error ? (

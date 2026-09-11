@@ -411,7 +411,7 @@ export default function NewPOPage() {
 			</div>
 
 			{/* Scrollable body */}
-			<div className="flex-1 overflow-y-auto overflow-x-hidden">
+			<div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
 				{(result || hydrating) && (
 					<div className="px-4 sm:px-8 pt-5 flex flex-col gap-2.5">
 						{result && (

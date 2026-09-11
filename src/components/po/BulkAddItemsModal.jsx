@@ -116,7 +116,7 @@ export default function BulkAddItemsModal({
 							</div>
 						</div>
 
-						<div className="flex-1 overflow-auto">
+						<div className="flex-1 min-h-0 overflow-auto">
 							{error ? (
 								<p className="px-4 py-6 text-[13px] text-danger text-center">
 									{error}
@@ -205,7 +205,7 @@ export default function BulkAddItemsModal({
 							</div>
 						</div>
 
-						<div className="flex-1 overflow-auto px-5">
+						<div className="flex-1 min-h-0 overflow-auto px-5">
 							{pickedList.length === 0 ? (
 								<div className="h-full flex flex-col items-center justify-center text-center p-10">
 									<div className="w-12 h-12 rounded bg-surface-2 border border-line flex items-center justify-center mb-3">

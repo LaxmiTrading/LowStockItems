@@ -334,7 +334,7 @@ export default function LostSaleFormPage() {
 			</div>
 
 			{/* Body */}
-			<div className="flex-1 overflow-y-auto overflow-x-hidden">
+			<div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
 				{loadingRecord && (
 					<div className="px-4 sm:px-8 pt-5">
 						<div className="px-4 py-3 text-[13px] text-body-3 bg-surface-2 border border-line rounded flex items-center gap-2.5">
