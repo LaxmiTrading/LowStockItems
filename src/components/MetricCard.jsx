@@ -89,11 +89,11 @@ export default function MetricCard({
 	const t = TONES[resolved] || TONES.neutral;
 
 	return (
-		<div className="flex-1 min-w-0 bg-surface border border-line rounded px-5 py-[17px]">
+		<div className="flex-1 min-w-0 bg-surface border border-line rounded px-3 py-3 sm:px-5 sm:py-[17px]">
 			<div className="flex items-center gap-3">
 				{icon && (
 					<span
-						className={`w-9 h-9 rounded border flex items-center justify-center flex-shrink-0 ${t.chip}`}>
+						className={`hidden sm:flex w-9 h-9 rounded border items-center justify-center flex-shrink-0 ${t.chip}`}>
 						<svg
 							width="17"
 							height="17"
@@ -109,18 +109,18 @@ export default function MetricCard({
 				)}
 
 				<div className="min-w-0">
-					<div className="text-[11.5px] font-bold text-muted tracking-[.05em] uppercase truncate">
+					<div className="text-[11px] sm:text-[11.5px] font-bold text-muted tracking-[.04em] sm:tracking-[.05em] uppercase leading-tight">
 						{label}
 					</div>
 					<div
-						className={`num text-[27px] leading-[1.15] font-black tracking-[-.02em] ${t.value}`}>
+						className={`num text-[22px] sm:text-[27px] leading-[1.15] font-black tracking-[-.02em] mt-0.5 ${t.value}`}>
 						{shown}
 					</div>
 				</div>
 			</div>
 
 			{hint && (
-				<div className="mt-2 text-[11.5px] text-muted-2 leading-snug truncate">
+				<div className="hidden sm:block mt-2 text-[11.5px] text-muted-2 leading-snug">
 					{hint}
 				</div>
 			)}

@@ -266,7 +266,7 @@ export default function ZohoItemsTable() {
 						{groupBy === 'vendor' ? 'vendor' : groupBy}.
 					</p>
 				</div>
-				<div className="flex-1" />
+				<div className="hidden lg:block flex-1" />
 
 				<button
 					onClick={() => openNewPO(false)}
@@ -393,7 +393,7 @@ export default function ZohoItemsTable() {
 			    reachable however far down a long catalogue you are. */}
 			<div className="sticky top-[52px] z-20 -mx-4 sm:-mx-6 lg:-mx-7 px-4 sm:px-6 lg:px-7 pt-1 pb-3 bg-app">
 				<div className="flex items-center gap-2.5 flex-wrap">
-					<div className="group flex items-center gap-2 border border-line-2 rounded bg-surface px-[11px] h-10 lg:h-9 w-full lg:w-72 transition-colors focus-within:border-muted-3">
+					<div className="group flex items-center gap-2 border border-line-2 rounded bg-surface px-[11px] h-10 lg:h-9 flex-1 lg:flex-none lg:w-72 transition-colors focus-within:border-muted-3">
 						<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="flex-shrink-0 text-muted-3 transition-colors group-focus-within:text-brand">
 							<circle cx="11" cy="11" r="7" />
 							<path d="M21 21l-4-4" strokeLinecap="round" />
@@ -431,14 +431,14 @@ export default function ZohoItemsTable() {
 						</span>
 					)}
 
-					<div className="flex-1" />
+					<div className="hidden lg:block flex-1" />
 
-					<span className="hidden sm:block text-[12px] text-muted font-bold">Group by</span>
+					<span className="hidden lg:block text-[12px] text-muted font-bold">Group by</span>
 					{/* The white plate slides between the three options rather than
 					    being repainted under whichever one is active, so a change of
 					    grouping is something you watch happen. Equal thirds keep the
 					    travel a plain multiple of the plate's own width. */}
-					<div className="relative flex flex-1 sm:flex-none w-full sm:w-[300px] bg-surface-2 border border-line rounded p-[3px]">
+					<div className="order-2 lg:order-none relative flex w-full lg:w-[300px] bg-surface-2 border border-line rounded p-[3px]">
 						<span
 							aria-hidden
 							className="absolute top-[3px] bottom-[3px] left-[3px] rounded bg-surface border border-line transition-transform duration-300 ease-smooth"
@@ -466,7 +466,7 @@ export default function ZohoItemsTable() {
 
 					<button
 						onClick={toggleExpandAll}
-						className="h-10 sm:h-9 px-3 rounded border border-line-2 bg-surface text-body-3 font-bold text-[12.5px] cursor-pointer flex items-center gap-1.5 hover:border-brand-300 hover:text-brand-600 transition-all duration-200 ease-smooth flex-shrink-0">
+						className="order-1 lg:order-none h-10 sm:h-9 px-3 rounded border border-line-2 bg-surface text-body-3 font-bold text-[12.5px] cursor-pointer flex items-center gap-1.5 hover:border-brand-300 hover:text-brand-600 transition-all duration-200 ease-smooth flex-shrink-0">
 						<svg
 							width="13"
 							height="13"
@@ -574,7 +574,7 @@ export default function ZohoItemsTable() {
 									{groupItems.length} item{groupItems.length !== 1 ? 's' : ''}
 								</span>
 
-								<div className="flex-1" />
+								<div className="hidden lg:block flex-1" />
 
 								{pickedHere > 0 && (
 									<span className="num text-[11px] font-black text-brand-700 bg-brand-100 rounded-full px-2.5 py-0.5 animate-pop-in flex-shrink-0">

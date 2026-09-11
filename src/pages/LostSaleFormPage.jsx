@@ -4,6 +4,7 @@ import { getCustomers, getAllItems } from '../components/ZohoAPI';
 import { createLostSale, updateLostSale, listLostSales } from '../lib/lostSales';
 import Field from '../components/Field';
 import ItemPicker from '../components/po/ItemPicker';
+import { useIsDesktop } from '../lib/useMediaQuery';
 import CustomerPicker from '../components/lost/CustomerPicker';
 import AdvancedCustomerSearch from '../components/lost/AdvancedCustomerSearch';
 import ContactDetails from '../components/ContactDetails';
@@ -63,6 +64,7 @@ function rowFromItem(item) {
 }
 
 export default function LostSaleFormPage() {
+	const isDesktop = useIsDesktop();
 	const navigate = useNavigate();
 	const { id: editId } = useParams();
 	const location = useLocation();
@@ -426,12 +428,107 @@ export default function LostSaleFormPage() {
 
 						{rows.map((r) => {
 							const onHand = Number(r.available_stock ?? r.stock_on_hand ?? 0) || 0;
+
+							/* Below lg the three columns stack, so each figure carries
+							   its own label and the remove button comes in from the
+							   gutter — there is no gutter, and at the screen edge it was
+							   simply cut off. */
+							if (!isDesktop) {
+								return (
+									<div key={r.key} className="px-4 py-3.5 border-b border-line bg-surface">
+										{isFilled(r) ? (
+											<>
+												<div className="flex items-start gap-2">
+													<div className="min-w-0 flex-1">
+														<div className="flex items-center gap-[7px] flex-wrap">
+															<span className="font-black text-[14px] text-heading">
+																{r.name}
+															</span>
+															{r.isFreeText && (
+																<span className="text-[10px] font-black text-warn-2 bg-warn-bg border border-warn-border rounded-full px-2 py-px">
+																	new
+																</span>
+															)}
+														</div>
+														{r.isFreeText ? (
+															<div className="text-[11.5px] text-warn-2 mt-1 leading-[1.35]">
+																Free-text item — recorded, but excluded from the
+																reorder algorithm.
+															</div>
+														) : (
+															<div className="text-[11.5px] text-muted-2 mt-0.5">
+																SKU: {r.sku || '—'}
+															</div>
+														)}
+													</div>
+
+													<button
+														onClick={() => removeRow(r.key)}
+														aria-label={`Remove ${r.name || 'this line'}`}
+														className="no-press w-9 h-9 flex-shrink-0 rounded border border-line-2 bg-surface flex items-center justify-center cursor-pointer text-body-3">
+														<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+															<path d="M3 6h18" />
+															<path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+															<path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6" />
+															<path d="M10 11v6M14 11v6" />
+														</svg>
+													</button>
+												</div>
+
+												<div className="flex items-end gap-3 mt-3">
+													<div className="min-w-0">
+														<span className="block text-[11px] font-bold text-muted tracking-[.04em] uppercase mb-1">
+															On hand
+														</span>
+														<span
+															className={`num text-[15px] font-bold ${
+																r.isFreeText
+																	? 'text-muted-2'
+																	: onHand > 0
+																		? 'text-ok'
+																		: 'text-danger'
+															}`}>
+															{r.isFreeText ? '—' : onHand}
+														</span>
+													</div>
+
+													<label className="flex-1 min-w-0">
+														<span className="block text-[11px] font-bold text-muted tracking-[.04em] uppercase mb-1">
+															Qty wanted
+														</span>
+														<input
+															type="number"
+															min="1"
+															inputMode="numeric"
+															value={r.qty}
+															placeholder="—"
+															onChange={(e) => {
+																setQty(r.key, e.target.value);
+																setErrors((x) => ({ ...x, items: null }));
+															}}
+															className="num w-full h-10 border border-line-2 rounded px-2.5 text-right text-[14px] font-bold outline-none bg-surface transition-colors focus:border-muted-3"
+														/>
+													</label>
+												</div>
+											</>
+										) : (
+											<ItemPicker
+												items={allItems}
+												loading={itemsLoading}
+												error={itemsError}
+												onPick={(item) => pickItem(r.key, item)}
+											/>
+										)}
+									</div>
+								);
+							}
+
 							return (
 							<div
 								key={r.key}
-								className="group flex flex-col lg:grid border-b border-line lg:items-stretch relative bg-surface hover:bg-brand-50/40 transition-colors duration-150"
+								className="group grid border-b border-line items-stretch relative bg-surface hover:bg-brand-50/40 transition-colors duration-150"
 								style={{ gridTemplateColumns: ITEM_COLS }}>
-								<div className="px-3.5 py-3 lg:border-r border-line min-w-0">
+								<div className="px-3.5 py-3 border-r border-line min-w-0">
 									{isFilled(r) ? (
 										<div className="pl-2.5">
 											<div className="flex items-center gap-[7px] flex-wrap">
@@ -469,7 +566,7 @@ export default function LostSaleFormPage() {
 								{/* Stock at the moment of logging — the same colour rule the
 								    PO table uses, so an out-of-stock line reads the same way
 								    on both pages. */}
-								<div className="num px-3.5 pb-3 lg:py-3 lg:border-r border-line text-left lg:text-right text-[13.5px] min-w-0">
+								<div className="num px-3.5 py-3 border-r border-line text-right text-[13.5px] min-w-0">
 									{!isFilled(r) || r.isFreeText ? (
 										<span className="text-muted-2">—</span>
 									) : (
@@ -503,7 +600,7 @@ export default function LostSaleFormPage() {
 										onClick={() => removeRow(r.key)}
 										title="Remove line"
 										aria-label={`Remove ${r.name || 'this line'}`}
-										className="no-press absolute right-[-38px] top-1/2 -translate-y-1/2 w-7 h-7 rounded border border-line-2 bg-surface flex items-center justify-center cursor-pointer text-body-3 hover:bg-danger-bg hover:border-danger-border hover:text-danger">
+										className="no-press absolute right-[-38px] top-1/2 -translate-y-1/2 w-7 h-7 rounded border border-line-2 bg-surface flex items-center justify-center cursor-pointer text-body-3 reveal-on-hover hover:bg-danger-bg hover:border-danger-border hover:text-danger">
 										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
 											<path d="M3 6h18" />
 											<path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
