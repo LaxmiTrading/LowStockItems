@@ -47,7 +47,10 @@ export default async (request) => {
 		}
 
 		const credentials = await requireResolvedCredentials();
-		const token = await getAccessToken();
+		// getAccessToken hands back the token *and* the data centre it is valid
+		// against. Interpolating the whole object sent "[object Object]" as the
+		// token, every read 401'd, and the purge silently deleted nothing.
+		const { accessToken, apiDomain } = await getAccessToken();
 
 		const purged = [];
 		let checked = 0;
@@ -56,9 +59,9 @@ export default async (request) => {
 		for (const row of tracked) {
 			try {
 				const res = await fetch(
-					`${credentials.apiDomain}/books/v3/purchaseorders/${encodeURIComponent(row.purchaseorder_id)}` +
+					`${apiDomain}/books/v3/purchaseorders/${encodeURIComponent(row.purchaseorder_id)}` +
 						`?organization_id=${encodeURIComponent(credentials.organizationId)}`,
-					{ headers: { Authorization: `Zoho-oauthtoken ${token}` } },
+					{ headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } },
 				);
 
 				// 404 means Zoho no longer has the order at all — deleted at the

@@ -22,7 +22,8 @@
 		"build": "react-scripts build",
 		"test": "react-scripts test",
 		"eject": "react-scripts eject",
-		"migrate": "node database/migrations/run.mjs"
+		"migrate": "node database/migrations/run.mjs",
+		"zoho:token": "node scripts/zoho-token.mjs"
 	},
 	"eslintConfig": {
 		"extends": [
