@@ -185,7 +185,9 @@ export default function TransactionDocument({ type, docId, number, onBack }) {
 
 	return (
 		<div className="h-full flex flex-col bg-surface">
-			{/* Back to the transaction list */}
+			{/* Back to the transaction list. Omitted when this is embedded in a
+			    surface that carries a header of its own. */}
+			{onBack && (
 			<div className="flex items-center gap-2.5 px-5 py-3 border-b border-line flex-shrink-0">
 				<button
 					onClick={onBack}
@@ -202,6 +204,7 @@ export default function TransactionDocument({ type, docId, number, onBack }) {
 					<div className="text-[11px] text-muted">{cfg.label}</div>
 				</div>
 			</div>
+			)}
 
 			<div className="flex-1 min-h-0 overflow-y-auto bg-sidebar px-4 sm:px-5 py-5">
 				{loading ? (

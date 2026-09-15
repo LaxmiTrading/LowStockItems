@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AppShell from './components/AppShell';
 import ZohoItemTable from './components/ZohoItemTable';
 import NewPOPage from './pages/NewPOPage';
+import PurchaseOrdersPage from './pages/PurchaseOrdersPage';
 import LostSalesListPage from './pages/LostSalesListPage';
 import LostSaleFormPage from './pages/LostSaleFormPage';
 import ReorderSuggestionsPage from './pages/ReorderSuggestionsPage';
@@ -72,6 +73,7 @@ function Protected() {
 			<Route element={<AppShell />}>
 				<Route path="/" element={<ZohoItemTable />} />
 				<Route path="/po/new" element={<NewPOPage />} />
+				<Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
 				<Route path="/lost-sales" element={<LostSalesListPage />} />
 				<Route path="/lost-sales/new" element={<LostSaleFormPage />} />
 				<Route path="/lost-sales/:id/edit" element={<LostSaleFormPage />} />

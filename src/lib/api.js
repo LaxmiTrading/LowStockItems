@@ -56,6 +56,10 @@ async function request(path, { method = 'GET', body } = {}) {
 export const api = {
 	get: (path) => request(path),
 	post: (path, body) => request(path, { method: 'POST', body }),
+	put: (path, body) => request(path, { method: 'PUT', body }),
+	// No body: the endpoints that delete identify the row in the query string,
+	// because the router matches literal paths and has no parameters.
+	delete: (path) => request(path, { method: 'DELETE' }),
 };
 
 /* ------------------------------------------------------------------ auth */

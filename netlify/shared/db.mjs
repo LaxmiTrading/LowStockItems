@@ -15,6 +15,13 @@ import { DatabaseUnavailableError } from './errors.mjs';
 // bigints here are row counts, comfortably inside the safe integer range.
 pg.types.setTypeParser(20, (value) => Number.parseInt(value, 10));
 
+// DATE (oid 1082) arrives as a JS Date at *local* midnight, which JSON then
+// serializes as UTC. East of Greenwich that moves the day backwards: a vendor
+// promising 2026-09-18 reaches the browser as 2026-09-17T18:30:00Z and is read
+// as the 17th. A bare calendar date has no time and no zone, so it is kept as
+// the 'YYYY-MM-DD' string Postgres already sent.
+pg.types.setTypeParser(1082, (value) => value);
+
 function connectionString() {
 	const url =
 		process.env.DATABASE_URL ??
@@ -116,4 +123,47 @@ export async function queryOne(text, parameters = []) {
 export async function queryMany(text, parameters = []) {
 	const result = await query(text, parameters);
 	return result.rows;
+}
+
+/**
+ * Run `fn` inside a transaction, on one client held for its duration.
+ *
+ * Needed wherever a write is only correct as a whole — logging a vendor call
+ * inserts the event, may move the order's status, and recomputes the order's
+ * next reminder, and an order left with a reminder that no surviving call
+ * asked for would notify forever.
+ *
+ * `fn` is handed a `run(text, params)` rather than the raw client, so callers
+ * cannot accidentally reach for the pool's `query` mid-transaction and have
+ * that statement land on a different connection, outside the transaction.
+ *
+ * Keep the work inside short and free of network calls: the pool is `max: 3`
+ * per instance, so a client held across an HTTP request starves the others.
+ */
+export async function withTransaction(fn) {
+	const client = await getPool().connect();
+	try {
+		await client.query('BEGIN');
+		const result = await fn((text, parameters = []) =>
+			client.query(text, parameters),
+		);
+		await client.query('COMMIT');
+		return result;
+	} catch (error) {
+		// A rollback can itself fail on a broken connection. The original error
+		// is the one worth reporting, so this must not replace it.
+		try {
+			await client.query('ROLLBACK');
+		} catch (rollbackError) {
+			console.error('[db] rollback failed', {
+				message: rollbackError?.message,
+			});
+		}
+		if (CONNECTION_CODES.has(String(error?.code))) {
+			throw new DatabaseUnavailableError();
+		}
+		throw error;
+	} finally {
+		client.release();
+	}
 }

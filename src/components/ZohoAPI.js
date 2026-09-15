@@ -688,6 +688,9 @@ export const TRANSACTION_TYPES = {
 		statuses: [
 			['', 'All'],
 			['Status.Draft', 'Draft'],
+			// Zoho keys an issued-but-unbilled order 'open'; getOpenPOItemIds and
+			// the purchase-order list both filter on it, so it belongs here too.
+			['Status.Open', 'Issued (open)'],
 			['Status.Billed', 'Billed'],
 			['Status.PartiallyBilled', 'Partially Billed'],
 			['Status.Cancelled', 'Cancelled'],
@@ -793,6 +796,109 @@ export async function getItemTransactions(
 	};
 }
 
+// ─── PURCHASE ORDER LIST ─────────────────────────────────────────────────────
+
+/**
+ * The statuses a PO is still worth chasing a vendor about: not yet sent, or
+ * sent and not yet billed. Once it is billed, cancelled or closed the order is
+ * settled and there is nothing left to follow up.
+ */
+export const FOLLOWABLE_PO_STATUSES = ['Status.Draft', 'Status.Open'];
+
+// The list endpoint returns far more than the table needs, and the raw names
+// are inconsistent with the rest of the app. Normalise once, here.
+function mapPurchaseOrder(po) {
+	return {
+		purchaseorder_id: po.purchaseorder_id,
+		purchaseorder_number: po.purchaseorder_number || '—',
+		vendor_id: po.vendor_id || null,
+		vendor_name: po.vendor_name || '—',
+		status: po.status || '',
+		billed_status: po.billed_status || '',
+		date: po.date || '',
+		delivery_date: po.delivery_date || '',
+		reference_number: po.reference_number || '',
+		total: Number(po.total) || 0,
+	};
+}
+
+/**
+ * Every purchase order in the given statuses, newest first.
+ *
+ * `filter_by` takes a single value, so each status is its own drain of the
+ * paginated endpoint rather than one combined call. The pages are deliberately
+ * serialized with `delay()` like every other batch read in this file — going
+ * wide here is the quickest way to a 429.
+ *
+ * `onProgress` receives the rows gathered so far, so the page can fill in as
+ * the drains complete instead of sitting blank until the last one.
+ */
+export async function listPurchaseOrders({
+	statuses = FOLLOWABLE_PO_STATUSES,
+	onProgress,
+} = {}) {
+	const byId = new Map();
+
+	for (const status of statuses) {
+		let page = 1;
+		let hasMore = true;
+
+		// Capped like getAllItems, so a malformed page_context cannot spin here
+		// forever.
+		while (hasMore && page <= 100) {
+			const params = new URLSearchParams({
+				organization_id: ORG_ID,
+				filter_by: status,
+				sort_column: 'date',
+				sort_order: 'D',
+				page: String(page),
+				per_page: '100',
+			});
+
+			const res = await fetchWithRetry(
+				`${BASE_PROXY}/purchaseorders?${params.toString()}`,
+				{ headers: authHeaders() },
+			);
+			const data = await res.json();
+
+			if (data.code !== undefined && data.code !== 0) {
+				throw new Error(data.message || 'Could not load purchase orders.');
+			}
+
+			for (const po of data.purchaseorders || []) {
+				// The status filters are disjoint, but a PO issued between two
+				// drains would appear in both. Keep the first sighting rather
+				// than listing it twice.
+				if (!byId.has(po.purchaseorder_id)) {
+					byId.set(po.purchaseorder_id, mapPurchaseOrder(po));
+				}
+			}
+
+			onProgress?.(sortPurchaseOrders([...byId.values()]));
+
+			hasMore = data.page_context?.has_more_page;
+			page++;
+			if (hasMore) await delay(300);
+		}
+
+		await delay(300);
+	}
+
+	return sortPurchaseOrders([...byId.values()]);
+}
+
+// Newest first. Each status is drained separately, so the concatenation is
+// only sorted within a status until this runs over the whole set.
+function sortPurchaseOrders(rows) {
+	return rows.sort(
+		(a, b) =>
+			String(b.date).localeCompare(String(a.date)) ||
+			String(b.purchaseorder_number).localeCompare(
+				String(a.purchaseorder_number),
+			),
+	);
+}
+
 // Documents are immutable enough for one session, and the panel reads the same
 // one twice — for a row's line, then again when that row is opened in full.
 const _docCache = new Map();
@@ -826,6 +932,18 @@ export async function getTransactionDocument(type, docId) {
 	p.catch(() => _docCache.delete(key));
 	_docCache.set(key, p);
 	return p;
+}
+
+/**
+ * Forget one cached document, so the next read goes back to Zoho.
+ *
+ * The cache has no expiry on purpose — it is what makes opening a row the
+ * panel already listed cost nothing. But a PO edited in Zoho would then show
+ * its old self for the rest of the session, so a refresh control needs a way
+ * to drop exactly one entry without weakening the cache for everything else.
+ */
+export function invalidateTransactionDocument(type, docId) {
+	_docCache.delete(`${type}:${docId}`);
 }
 
 // Our own registered particulars. The organizations list endpoint returns the

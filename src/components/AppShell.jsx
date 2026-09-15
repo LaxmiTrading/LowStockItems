@@ -10,6 +10,10 @@ import {
 	subscribe as subscribeToLoad,
 	getState as getLoadState,
 } from '../lib/lowStockRun';
+import {
+	subscribe as subscribeToPOs,
+	getState as getPOState,
+} from '../lib/poRun';
 
 export const TOP_BAR_H = 52;
 export const SIDEBAR_W = 236;
@@ -28,6 +32,18 @@ const NAV = [
 				<path d="M3 7l9-4 9 4-9 4-9-4z" />
 				<path d="M3 7v10l9 4 9-4V7" />
 				<path d="M12 11v10" />
+			</>
+		),
+	},
+	{
+		to: '/purchase-orders',
+		label: 'Purchase orders',
+		matches: (p) => p.startsWith('/purchase-orders'),
+		icon: (
+			<>
+				<path d="M9 3h6l1 3H8l1-3z" />
+				<path d="M5 6h14v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6z" />
+				<path d="M9 12h6M9 16h4" />
 			</>
 		),
 	},
@@ -147,6 +163,7 @@ export default function AppShell() {
 			: null;
 
 	const load = useSyncExternalStore(subscribeToLoad, getLoadState);
+	const pos = useSyncExternalStore(subscribeToPOs, getPOState);
 
 	const activity = {
 		'/reorder-suggestions':
@@ -158,6 +175,12 @@ export default function AppShell() {
 							: 'Computing',
 					}
 				: null,
+		'/purchase-orders': pos.phase === 'loading'
+			? {
+					label: pos.loaded ? String(pos.loaded) : '',
+					title: `Loaded ${pos.loaded} purchase orders`,
+				}
+			: null,
 		'/': load.phase === 'loading'
 			? {
 					label: load.loaded ? String(load.loaded) : '',

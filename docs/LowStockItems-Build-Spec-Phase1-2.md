@@ -446,3 +446,204 @@ Netlify Blobs needs no keys.
 - [ ] No secrets in client code.
 - [ ] No use of `localStorage` for anything except the existing auth
       tokens.
+
+---
+
+# PART 6 — Phase 3: Purchase order follow-up
+
+**Scope.** Raising a PO is covered by PART 2. This part covers what
+happens after it is issued: seeing the orders still open with a vendor,
+chasing them, and being reminded when a chase falls due.
+
+## 6.1 Route
+
+`/purchase-orders`, inside the `AppShell` layout route, with a fourth
+`NAV` entry in `AppShell.jsx`.
+
+**Use `/purchase-orders`, NOT `/po` or `/pos`.** The Low-stock nav entry
+matches `p.startsWith('/po')` so the New PO page keeps its tab lit; a
+shorter path would light two tabs at once.
+
+A `?po=<purchaseorder_id>` parameter opens that order's panel directly.
+This is what the reminder email and the notification click target.
+
+## 6.2 The list
+
+Open and draft orders only — anything billed, closed or cancelled is
+settled and has nothing left to chase.
+
+`listPurchaseOrders({ statuses, onProgress })` in `ZohoAPI.js` drains
+`GET /purchaseorders?filter_by=...` once per status. **`filter_by` takes
+a single value**, the same constraint `getLowStockItems` documents, so
+`Status.Draft` and `Status.Open` are two sequential drains merged on
+`purchaseorder_id`. Serialize the pages with `delay(300)` — the
+rate-limit discipline in that file is an invariant.
+
+The run lives in `src/lib/poRun.js`, the same module-level store shape as
+`lowStockRun.js`, so it survives navigation. It also holds the follow-up
+rows keyed by `purchaseorder_id`, so the status and due columns do not
+cost a request per row.
+
+Columns: DATE, PURCHASE ORDER#, VENDOR NAME, STATUS, FOLLOW-UP, NEXT
+CALL, AMOUNT. Filters: All / Drafts / Issued / Follow-up due.
+
+## 6.3 The detail panel
+
+`PurchaseOrderPanel.jsx` clones the shell of `po/ItemDetailsPanel.jsx` —
+portal, `z-[95]`, right-docked, `lg:w-[880px]`, body-scroll lock, Escape
+to close.
+
+The DETAILS tab renders the **existing** `po/TransactionDocument.jsx`,
+which already draws the whole order. Its back strip is now conditional on
+`onBack`, which the panel omits because it carries a header of its own.
+
+`getTransactionDocument` caches for the session with no expiry, so the
+panel carries a Refresh that calls `invalidateTransactionDocument` and
+remounts the child. Do not give that cache a TTL — it is what makes
+opening an already-listed row free in the item panel.
+
+## 6.4 Statuses and the flow
+
+Configuration, not code, because every business chases differently.
+
+- `po_followup_statuses` — name, tone, order, `is_initial`,
+  `is_terminal`, `archived_at`.
+- `po_followup_transitions` — a row permits `from -> to`. **The absence
+  of a row is what forbids a move.**
+
+`tone` names a palette role (`neutral` / `brand` / `ok` / `warn` /
+`danger`), never a colour: `index.css` redefines every `--c-*` for dark
+mode, so a stored hex would be wrong in one theme.
+
+The graph is checked when a move is attempted and **never** enforced
+against stored state, so rewiring the flow can never strand an order that
+is already somewhere.
+
+**Removing a status archives it when orders still hold it.** The API
+attempts a real `DELETE` and falls back to setting `archived_at` on a
+foreign-key violation — the database decides, not a count the handler
+takes first and then races against. Archiving is refused for the last
+live status and for the only `is_initial` one.
+
+Edited in Settings, Purchase-order follow-up: a status list, and a
+checkbox matrix for the flow saved whole in one request.
+
+## 6.5 Calls and the timeline
+
+`po_followup_events` holds calls and status moves together, because the
+timeline is one chronological list and two tables would make every read a
+UNION with dummy columns.
+
+Fields: `occurred_at`, `details`, `conclusion`, `promised_dispatch_date`,
+`promised_ready_date`, `needs_followup`, `next_followup_at`, the status
+move, and who logged it.
+
+`occurred_at` and `next_followup_at` are `TIMESTAMPTZ`; the promised
+dates are bare `DATE`. A promise of "Thursday" has no time of day, and
+storing it as an instant lets a conversion move it to Wednesday.
+
+**Exactly one field creates a reminder.** A toggle, "this order needs
+another call", reveals *Next follow-up on*. Promised dispatch and ready
+dates are recorded for the timeline and never notify.
+
+The browser converts every `datetime-local` with `.toISOString()` before
+sending, so the server needs no timezone correction. **Do not copy the
+one-day slack from `_lost-sales-shared.mjs`** — that exists because those
+fields are calendar dates, and an instant does not need it.
+
+The soonest pending reminder is denormalised onto
+`po_followups.next_followup_at` and recomputed inside the same
+transaction as every event write, so the reminder sweep is one
+partial-index read. Moving the date clears `notified_at`, which is what
+lets a rescheduled follow-up fire again.
+
+## 6.6 Endpoints (`netlify/functions/po-followups.mjs`)
+
+Extends the `/api/*` Postgres family — the `auth.mjs` route-table shape,
+`requireUser` / `requireAdministrator`, the `{ok, data}` envelope.
+**NOT** the Blobs family the lost-sale endpoints use.
+
+`matchRoute` compares literal pathnames and has no parameters, so ids go
+in the body on a write and in the query string on a read or a delete.
+
+- `GET /api/po/workflow` — statuses and edges (any signed-in user).
+- `POST` / `PUT` / `DELETE /api/po/workflow/statuses` — administrator.
+- `PUT /api/po/workflow/transitions` — replaces the graph whole.
+- `GET /api/po/followups` — every tracked order.
+- `GET /api/po/followups/detail?purchaseorderId=` — one, with its events.
+- `POST /api/po/followups/status` — a move on its own.
+- `POST` / `PUT` / `DELETE /api/po/followups/calls` — the call log.
+- `POST` / `DELETE /api/push/devices` — FCM registration.
+
+Server-side validation is the boundary: an illegal move is a 409
+`ILLEGAL_TRANSITION` whether or not the UI offered it. An administrator
+may override with `force`, which is recorded as `forced` on the event
+rather than hidden.
+
+## 6.7 Reminders
+
+`netlify/functions/followups-due.mjs`, every 15 minutes. It claims due
+rows with a single `UPDATE ... FOR UPDATE SKIP LOCKED` **before** sending
+anything, so a timeout cannot notify twice — a duplicate reminder is
+worse than a late one, because the late one is still visible in the list
+while the duplicate teaches people to ignore the alert.
+
+Then a web push to every registered device and one **digest** email to
+every active profile. Five due orders must not be five emails.
+
+Push is FCM HTTP v1 with a hand-signed service-account JWT
+(`shared/push/fcm.mjs`) — no `firebase-admin`, which would be bundled
+into every function for one signature. Email is a single `fetch` to
+Resend (`shared/email/resend.mjs`) — no SDK. Both are **silent when
+unconfigured**, so a site with no credentials still completes a run.
+
+Every date in an email is formatted with an explicit
+`timeZone: 'Asia/Kolkata'`. The function runs in UTC, so without it a
+follow-up set for 11:30 reads as 06:00.
+
+`public/firebase-messaging-sw.js` is served from the root for scope `/`.
+Files in `public/` are copied verbatim with no `process.env`
+substitution, so its Firebase config arrives on the registration query
+string. It has deliberately **no `fetch` handler** — one would put it in
+front of every request the app makes. Permission is only requested from
+the Settings button; an unprompted request is the fastest route to a
+permanent browser-level block.
+
+## 6.8 Forgetting finished orders
+
+`netlify/functions/followups-purge.mjs`, daily. Once an order is billed,
+closed or cancelled its follow-up row and call history are **deleted
+outright** (`ON DELETE CASCADE` takes the events with it).
+
+**A row is deleted only when Zoho has been asked about that specific
+order and has answered with a final status.** Absence from a list is
+never evidence — a half-drained pagination loop looks identical to "no
+longer open", and reading that as "received" would destroy months of call
+history in one bad run. The PO numbers deleted are logged, because the
+function log is the only record that survives.
+
+Both scheduled functions are still reachable at their URL and cannot call
+`requireUser`, so anything that is not Netlify's own scheduled invocation
+must present `CRON_SECRET`, and gets a **404** otherwise.
+
+## 6.9 Acceptance criteria
+
+- [ ] The tab lists the same open and draft orders as Zoho's own screen.
+- [ ] A row opens the panel with line items, taxes and totals.
+- [ ] Refresh in the panel re-reads past the session document cache.
+- [ ] Settings can add, rename, recolour, reorder and remove a status.
+- [ ] Removing a status that orders hold archives it and says so; those
+      orders still show it, marked removed.
+- [ ] Removing the last status, or the only starting status, is refused.
+- [ ] An illegal move is refused by the **server**, not merely hidden.
+- [ ] An administrator override is recorded as `forced` on the timeline.
+- [ ] A logged call appears in the timeline with the right local time.
+- [ ] Only *Next follow-up on* creates a reminder.
+- [ ] Editing a call moves the parent reminder and clears `notified_at`.
+- [ ] Deleting the call that set a reminder clears it.
+- [ ] A due follow-up notifies once, not on every subsequent tick.
+- [ ] Running the sweep twice sends nothing the second time.
+- [ ] Billing a PO in Zoho and running the purge removes its rows.
+- [ ] A Zoho error during the purge deletes nothing.
+- [ ] Both scheduled functions 404 without `CRON_SECRET`.
+- [ ] Every new screen is correct in both light and dark themes.
