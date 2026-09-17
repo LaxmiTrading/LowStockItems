@@ -12,10 +12,14 @@
  * endpoint exists to someone guessing at it.
  */
 
-import { queryMany, query } from '../shared/db.mjs';
+import { queryMany, queryOne, query } from '../shared/db.mjs';
 import { appBaseUrl } from '../shared/http.mjs';
 import { sendPush } from '../shared/push/fcm.mjs';
 import { renderDueDigest, sendEmail } from '../shared/email/resend.mjs';
+import {
+	readReminderGate,
+	recordReminderCheck,
+} from '../shared/po/reminderGate.mjs';
 
 const BATCH = 100;
 
@@ -25,8 +29,36 @@ function authorised(request) {
 	return Boolean(secret) && request.headers.get('x-cron-key') === secret;
 }
 
+/**
+ * Remember when the next reminder falls due, so the ticks before then can skip
+ * the database. Best-effort: if this fails, the next tick simply queries.
+ */
+async function recordNextDue(gate, checkedAt) {
+	try {
+		const row = await queryOne(
+			`SELECT MIN(next_followup_at) AS next_due
+			   FROM po_followups
+			  WHERE next_followup_at IS NOT NULL AND notified_at IS NULL`,
+		);
+		await recordReminderCheck(gate, { nextDueAt: row?.next_due ?? null, checkedAt });
+	} catch (error) {
+		console.warn('[followups-due] could not record the next due time', {
+			message: error?.message,
+		});
+	}
+}
+
 export default async (request) => {
 	if (!authorised(request)) return new Response('Not found', { status: 404 });
+
+	// Nothing can be due before the soonest reminder, so until then this tick
+	// leaves Postgres asleep. See shared/po/reminderGate.mjs for why that is
+	// safe.
+	const gate = await readReminderGate();
+	if (gate.skip) {
+		return Response.json({ ok: true, data: { due: 0, skipped: true } });
+	}
+	const checkedAt = Date.now();
 
 	try {
 		// Claimed before anything is sent, and in one statement. If the send
@@ -54,6 +86,7 @@ export default async (request) => {
 		);
 
 		if (due.length === 0) {
+			await recordNextDue(gate, checkedAt);
 			return Response.json({ ok: true, data: { due: 0 } });
 		}
 
@@ -132,6 +165,7 @@ export default async (request) => {
 			});
 		}
 
+		await recordNextDue(gate, checkedAt);
 		console.log('[followups-due]', results);
 		return Response.json({ ok: true, data: results });
 	} catch (error) {

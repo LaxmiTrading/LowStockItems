@@ -58,12 +58,13 @@ async function callZoho(request, buildUrl, body, options) {
 	// The domain comes from the token, not from configuration: Zoho reports
 	// the data centre the account actually lives in, and a token is only valid
 	// against that one.
-	return fetch(buildUrl(apiDomain), {
+	const response = await fetch(buildUrl(apiDomain), {
 		method: request.method,
 		headers,
 		body,
 		redirect: 'manual',
 	});
+	return { response, accessToken };
 }
 
 export default async (request) => {
@@ -84,7 +85,8 @@ export default async (request) => {
 			throw new AppError('NOT_FOUND', 'Unsupported Zoho path.', 404);
 		}
 
-		const { organizationId } = await requireResolvedCredentials();
+		const credentials = await requireResolvedCredentials();
+		const { organizationId } = credentials;
 		const params = new URLSearchParams(url.search);
 		params.set('organization_id', organizationId);
 
@@ -97,14 +99,26 @@ export default async (request) => {
 				? undefined
 				: await request.text();
 
-		let response = await callZoho(request, buildUrl, body);
+		// The credentials resolved above are handed on, so a proxied call reads
+		// the connection row once rather than once here and again for the token.
+		let { response, accessToken: usedToken } = await callZoho(
+			request,
+			buildUrl,
+			body,
+			{ credentials },
+		);
 
-		// A 401 means the cached access token died early — Zoho can revoke one
-		// before its stated expiry. Force one refresh and retry; a second 401
-		// is a real credential problem and is passed through.
+		// A 401 means the access token died early — Zoho can revoke one before
+		// its stated expiry. Clear it from the shared cache, but only if it is
+		// still the token this request used (another may already have replaced
+		// it), then retry once. A second 401 is a real credential problem and is
+		// passed through.
 		if (response.status === 401) {
-			invalidateAccessToken();
-			response = await callZoho(request, buildUrl, body, { forceRefresh: true });
+			await invalidateAccessToken(usedToken);
+			({ response } = await callZoho(request, buildUrl, body, {
+				credentials,
+				forceRefresh: true,
+			}));
 		}
 
 		const payload = await response.text();

@@ -23,7 +23,8 @@
 		"test": "react-scripts test",
 		"eject": "react-scripts eject",
 		"migrate": "node database/migrations/run.mjs",
-		"zoho:token": "node scripts/zoho-token.mjs"
+		"zoho:token": "node scripts/zoho-token.mjs",
+		"admin:local": "node scripts/create-local-admin.mjs"
 	},
 	"eslintConfig": {
 		"extends": [

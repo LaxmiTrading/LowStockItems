@@ -88,8 +88,8 @@ export const setUserStatus = (userId, status) =>
 
 /* --------------------------------------------------------------- security */
 
-export const loginActivity = (limit = 50) =>
-	api.get(`/api/auth/login-activity?limit=${limit}`);
+export const loginActivity = (limit = 50, offset = 0) =>
+	api.get(`/api/auth/login-activity?limit=${limit}&offset=${offset}`);
 
 /** Omit userId to end your own sessions everywhere. */
 export const endSessions = (userId) =>

@@ -1,28 +1,18 @@
-const TONE_DOT = {
-	neutral: 'bg-muted-3',
-	brand: 'bg-brand',
-	ok: 'bg-ok',
-	warn: 'bg-warn',
-	danger: 'bg-danger',
-};
+import { directionLabel, outcomeLabel } from '../../lib/poFollowups';
+import { toneDot } from '../../lib/tones';
 
-export const TONE_PILL = {
-	neutral: 'bg-surface-2 text-muted border-line-2',
-	brand: 'bg-brand-bg text-link border-brand-border',
-	ok: 'bg-ok-bg text-ok border-ok-border',
-	warn: 'bg-warn-bg text-warn-2 border-warn-border',
-	danger: 'bg-danger-bg text-danger border-danger-border',
-};
-
+/**
+ * A stage name with its colour. The pill is neutral and only the dot is
+ * coloured, so it reads the same in both themes.
+ */
 export function StatusPill({ name, tone, archived, className = '' }) {
 	if (!name) return null;
 	return (
 		<span
-			className={`inline-flex items-center gap-1 text-[10.5px] font-bold px-2 py-0.5 rounded-full border ${
-				TONE_PILL[tone] ?? TONE_PILL.neutral
-			} ${className}`}>
+			className={`inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2 py-0.5 rounded-full border bg-surface-2 border-line text-body-2 whitespace-nowrap ${className}`}>
+			<span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${toneDot(tone)}`} />
 			{name}
-			{/* A status archived while orders still sit on it must still read as
+			{/* A stage removed while orders still sit on it must still read as
 			    something, rather than silently going blank. */}
 			{archived && <span className="opacity-60 font-normal">(removed)</span>}
 		</span>
@@ -65,9 +55,9 @@ function Meta({ label, value }) {
 /**
  * Every call and status move against one order, newest first.
  *
- * Newest first because the question being asked is almost always "where did we
- * get to?", not "how did this start" — and it matches every other log in the
- * app.
+ * Newest first because the question being asked is almost always "where did
+ * we get to?", not "how did this start" — and it matches every other log in
+ * the app.
  */
 export default function FollowUpTimeline({
 	events,
@@ -91,7 +81,7 @@ export default function FollowUpTimeline({
 		<ol className="list-none m-0 p-0 relative">
 			{events.map((e, i) => {
 				const isLast = i === events.length - 1;
-				const tone = statusTone(e.toStatusId) ?? 'neutral';
+				const tone = statusTone(e.toStatusId);
 
 				return (
 					<li key={e.id} className="relative pl-7 pb-5 last:pb-0">
@@ -102,7 +92,7 @@ export default function FollowUpTimeline({
 						)}
 						<span
 							className={`absolute left-0 top-[5px] w-[11px] h-[11px] rounded-full border-2 border-surface ${
-								TONE_DOT[tone] ?? TONE_DOT.neutral
+								e.toStatusId ? toneDot(tone) : 'bg-muted-3'
 							}`}
 						/>
 
@@ -112,6 +102,11 @@ export default function FollowUpTimeline({
 									<span className="text-[12px] font-bold text-body-2 num">
 										{fmtWhen(e.occurredAt)}
 									</span>
+									{e.direction && (
+										<span className="text-[10px] font-bold uppercase tracking-[.04em] text-muted-2">
+											{directionLabel(e.direction)}
+										</span>
+									)}
 									{e.kind === 'status_change' && (
 										<span className="text-[10px] font-bold uppercase tracking-[.04em] text-muted-2">
 											Status change
@@ -130,7 +125,10 @@ export default function FollowUpTimeline({
 									<div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
 										{e.fromStatusName && (
 											<>
-												<StatusPill name={e.fromStatusName} tone="neutral" />
+												<StatusPill
+													name={e.fromStatusName}
+													tone={statusTone(e.fromStatusId)}
+												/>
 												<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="text-muted-3">
 													<path d="M5 12h14M13 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
 												</svg>
@@ -142,6 +140,13 @@ export default function FollowUpTimeline({
 									</div>
 								)}
 
+								{e.outcome && (
+									<p className="text-[13px] font-bold text-body m-0 mt-1.5">
+										{outcomeLabel(e.outcome)}
+									</p>
+								)}
+								{/* No longer asked for on a call, but still on calls logged
+								    before the outcome list, and on a status move's note. */}
 								{e.conclusion && (
 									<p className="text-[13px] font-bold text-body m-0 mt-1.5">
 										{e.conclusion}
@@ -164,10 +169,7 @@ export default function FollowUpTimeline({
 											/>
 										)}
 										{e.promisedReadyDate && (
-											<Meta
-												label="Ready by"
-												value={fmtDay(e.promisedReadyDate)}
-											/>
+											<Meta label="Ready by" value={fmtDay(e.promisedReadyDate)} />
 										)}
 										{e.nextFollowupAt && (
 											<span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold text-link">

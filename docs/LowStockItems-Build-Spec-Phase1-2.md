@@ -487,46 +487,95 @@ cost a request per row.
 Columns: DATE, PURCHASE ORDER#, VENDOR NAME, STATUS, FOLLOW-UP, NEXT
 CALL, AMOUNT. Filters: All / Drafts / Issued / Follow-up due.
 
-## 6.3 The detail panel
+## 6.3 The detail panel and the actions
 
 `PurchaseOrderPanel.jsx` clones the shell of `po/ItemDetailsPanel.jsx` —
 portal, `z-[95]`, right-docked, `lg:w-[880px]`, body-scroll lock, Escape
-to close.
+stepping back one layer at a time.
 
 The DETAILS tab renders the **existing** `po/TransactionDocument.jsx`,
-which already draws the whole order. Its back strip is now conditional on
+which already draws the whole order. Its back strip is conditional on
 `onBack`, which the panel omits because it carries a header of its own.
 
-`getTransactionDocument` caches for the session with no expiry, so the
-panel carries a Refresh that calls `invalidateTransactionDocument` and
-remounts the child. Do not give that cache a TTL — it is what makes
-opening an already-listed row free in the item panel.
+**Change status** and **Log call** sit in the panel header beside Refresh,
+not inside the Follow-up tab, so they work from either tab. The chase is
+therefore loaded once, above the tabs, by `usePoFollowUp`; every write
+hands the fresh row up so the list behind the panel updates without a
+reload. An action that fails while DETAILS is showing reports in a strip
+under the tabs, not inside the tab that is hidden.
 
-## 6.4 Statuses and the flow
+**Log call is a dialog** (`LogCallModal.jsx`), opened from the header,
+from a row's action menu, and — for editing — from the timeline. The form
+re-seeds whenever its `initial` prop changes identity, so the dialog
+memoises it; a fresh object per render wipes what is being typed.
+
+The table has an **action column**: a "⋯" menu with View, Log call and a
+Change status submenu (`PoRowActions.jsx`). The menu is portalled with
+fixed coordinates because the table container clips overflow. Rows are
+`role="button"` divs rather than `<button>`s, since a button nested in a
+button is invalid and swallows clicks.
+
+Change status menus offer only the moves the pipeline allows
+(`StatusMenu.jsx`). An administrator may show every stage; that move is
+made as an override and recorded on the timeline as one.
+
+`getTransactionDocument` caches for the session with no expiry, so Refresh
+calls `invalidateTransactionDocument` and remounts the document. Do not give
+that cache a TTL — it is what makes opening an already-listed row free in
+the item panel.
+
+## 6.4 The pipeline
 
 Configuration, not code, because every business chases differently.
 
-- `po_followup_statuses` — name, tone, order, `is_initial`,
-  `is_terminal`, `archived_at`.
+- `po_followup_statuses` — the stages: name, colour (`tone`), order,
+  `is_initial` (the default), `outcome` (`won` / `lost` / NULL, with
+  `is_terminal` mirroring it), `archived_at`.
 - `po_followup_transitions` — a row permits `from -> to`. **The absence
   of a row is what forbids a move.**
 
-`tone` names a palette role (`neutral` / `brand` / `ok` / `warn` /
-`danger`), never a colour: `index.css` redefines every `--c-*` for dark
-mode, so a stored hex would be wrong in one theme.
+**Exactly one default.** Every order starts there. A partial unique index
+on a constant (`((TRUE)) WHERE is_initial AND archived_at IS NULL`) holds
+the database to it. The default cannot also be won or lost.
+
+**Won and lost record how a chase ended. Reaching one deletes nothing.**
+Follow-ups are removed by §6.8 only.
+
+`tone` names a colour from a fixed palette (slate, red, orange, amber,
+yellow, green, teal, cyan, blue, indigo, violet, pink) — never hex.
+`src/lib/tones.js` decides what each looks like. Only a small dot carries
+the colour; the pill around a stage name stays on neutral surface tokens,
+so stages read correctly in both themes without a dark copy of twelve hues.
+The five role names 0004 stored (neutral, brand, ok, warn, danger) are
+still accepted and migrated to palette colours.
 
 The graph is checked when a move is attempted and **never** enforced
 against stored state, so rewiring the flow can never strand an order that
 is already somewhere.
 
-**Removing a status archives it when orders still hold it.** The API
-attempts a real `DELETE` and falls back to setting `archived_at` on a
-foreign-key violation — the database decides, not a count the handler
-takes first and then races against. Archiving is refused for the last
-live status and for the only `is_initial` one.
+### Editing — Customize Pipeline
 
-Edited in Settings, Purchase-order follow-up: a status list, and a
-checkbox matrix for the flow saved whole in one request.
+Settings shows the stages and a **Customize Pipeline** dialog
+(`PipelineModal.jsx`): one row per stage with up/down arrows, a colour
+dot, the name, a Default toggle, trophy (won), cross (lost) and delete, an
+Add Stage button, and Cancel / Save Changes. Nothing is written until Save.
+
+Save sends the whole list to `PUT /api/po/workflow/pipeline`, applied in
+one transaction by `netlify/shared/po/pipeline.mjs` in an order that never
+trips a constraint: removals first (so a name deleted and re-added in one
+save does not collide), then clear the default and park kept names on
+their ids (so a two-way rename never has two live stages sharing a name),
+then write every stage in its new position.
+
+**Removing a stage that orders still use archives it** — hidden from every
+picker, still shown on those orders, its transitions dropped. An unused
+stage is deleted.
+
+**A new stage can be reached from every open stage**, and while open itself
+can move to any other. A stage with no transitions would be unreachable
+and Add Stage would appear to do nothing. The **Allowed moves** matrix
+below the stages narrows it; it is saved separately and whole, so closing
+the tab half way cannot leave the flow partly rewired.
 
 ## 6.5 Calls and the timeline
 
@@ -534,17 +583,24 @@ checkbox matrix for the flow saved whole in one request.
 timeline is one chronological list and two tables would make every read a
 UNION with dummy columns.
 
-Fields: `occurred_at`, `details`, `conclusion`, `promised_dispatch_date`,
-`promised_ready_date`, `needs_followup`, `next_followup_at`, the status
-move, and who logged it.
+The call form asks for: `occurred_at`; **Direction** (`direction`,
+`inbound` / `outbound`, radio buttons, Outbound preselected); **Outcome**
+(`outcome`, a dropdown of Goods Not Ready, Production Delayed, Dispatch
+Promised, Dispatched, LR Awaiting); **Notes** (`details`, optional); the
+status move; and the reminder. Direction and outcome are required on every
+new or edited call. Both are stored as codes, held to their set by a CHECK
+(migration 0007); the labels live in `src/lib/poFollowups.js`.
 
-`occurred_at` and `next_followup_at` are `TIMESTAMPTZ`; the promised
-dates are bare `DATE`. A promise of "Thursday" has no time of day, and
-storing it as an instant lets a conversion move it to Wednesday.
+`conclusion`, `promised_dispatch_date` and `promised_ready_date` are no
+longer asked for. The columns remain: calls logged before 0007 keep and
+show them, editing such a call leaves them untouched, and a status move
+made on its own stores its note in `conclusion`.
+
+`occurred_at` and `next_followup_at` are `TIMESTAMPTZ`.
 
 **Exactly one field creates a reminder.** A toggle, "this order needs
-another call", reveals *Next follow-up on*. Promised dispatch and ready
-dates are recorded for the timeline and never notify.
+another call", reveals *Next follow-up on*. Nothing else on the form
+notifies.
 
 The browser converts every `datetime-local` with `.toISOString()` before
 sending, so the server needs no timezone correction. **Do not copy the
@@ -574,6 +630,9 @@ in the body on a write and in the query string on a read or a delete.
 - `POST /api/po/followups/status` — a move on its own.
 - `POST` / `PUT` / `DELETE /api/po/followups/calls` — the call log.
 - `POST` / `DELETE /api/push/devices` — FCM registration.
+- `PUT /api/po/workflow/pipeline` — saves every stage at once (§6.4).
+- `POST /api/po/followups/reconcile` — asks the server to run §6.8;
+  any signed-in user, at most once every ten minutes.
 
 Server-side validation is the boundary: an illegal move is a 409
 `ILLEGAL_TRANSITION` whether or not the UI offered it. An administrator
@@ -611,20 +670,39 @@ permanent browser-level block.
 
 ## 6.8 Forgetting finished orders
 
-`netlify/functions/followups-purge.mjs`, daily. Once an order is billed,
-closed or cancelled its follow-up row and call history are **deleted
-outright** (`ON DELETE CASCADE` takes the events with it).
+A follow-up is kept while its order is still open with the vendor. **Once
+the order leaves Zoho's open and draft lists** — which is what billing,
+closing or cancelling it does — its follow-up row and call history are
+**deleted outright** (`ON DELETE CASCADE` takes the timeline).
 
-**A row is deleted only when Zoho has been asked about that specific
-order and has answered with a final status.** Absence from a list is
-never evidence — a half-drained pagination loop looks identical to "no
-longer open", and reading that as "received" would destroy months of call
-history in one bad run. The PO numbers deleted are logged, because the
-function log is the only record that survives.
+The follow-up's own stage never deletes anything, including won and lost.
 
-Both scheduled functions are still reachable at their URL and cannot call
-`requireUser`, so anything that is not Netlify's own scheduled invocation
-must present `CRON_SECRET`, and gets a **404** otherwise.
+`reconcileFollowups` in `netlify/shared/zoho/purchaseOrders.mjs` does it:
+read every page of `Status.Draft` and `Status.Open` from Zoho server-side,
+then delete tracked rows whose `purchaseorder_id` is not in that set. It
+runs after the Purchase Orders page loads (`poRun` calls the reconcile
+endpoint, best-effort and silent) and daily from `followups-purge.mjs` as a
+backstop.
+
+Because the deletion cannot be undone, two rules hold it back:
+
+- **The list must be complete.** Every page HTTP 200 with `code: 0`,
+  pagination run to its end, under a page cap. Anything less is recorded
+  as `skipped: 'incomplete'` and deletes nothing — a fetch that failed half
+  way looks exactly like "those orders closed".
+- **A follow-up created after the sweep started is never deleted by it.**
+  An order raised a second after the list was read would otherwise be
+  missing from it and lose its first call.
+
+The server reads Zoho itself; it never accepts a list of ids from the
+browser, which would let any signed-in user delete any follow-up. A sweep
+is claimed atomically in `po_followup_reconcile`, at most one per ten
+minutes from the page and one per two minutes from anything, and records
+what it removed — including PO numbers — in `last_result`, which after a
+hard delete is the only record that those orders were chased.
+
+A partially billed order that Zoho drops from the open list is treated as
+closed.
 
 ## 6.9 Acceptance criteria
 
@@ -647,3 +725,14 @@ must present `CRON_SECRET`, and gets a **404** otherwise.
 - [ ] A Zoho error during the purge deletes nothing.
 - [ ] Both scheduled functions 404 without `CRON_SECRET`.
 - [ ] Every new screen is correct in both light and dark themes.
+- [ ] Change status and Log call are in the panel header beside Refresh.
+- [ ] Log call opens as a dialog from the header, a row menu and the timeline.
+- [ ] Every row has a ⋯ menu with View, Log call and Change status.
+- [ ] Customize Pipeline saves names, colours, order, default and outcomes
+      in one request; Cancel discards everything.
+- [ ] Exactly one default stage, enforced by the database.
+- [ ] Swapping two stage names in one save succeeds.
+- [ ] Reaching a won or lost stage deletes nothing.
+- [ ] A follow-up is deleted once its PO is missing from a complete open list.
+- [ ] A Zoho error on any page of that list deletes nothing.
+- [ ] Sign-in activity pages through every attempt with totals for all.

@@ -334,7 +334,7 @@ export default function ZohoItemsTable() {
 						{groupBy === 'vendor' ? 'vendor' : groupBy}.
 					</p>
 				</div>
-				<div className="hidden lg:block flex-1" />
+				<div className="hidden sm:block flex-1" />
 
 				<button
 					onClick={() => openNewPO(false)}

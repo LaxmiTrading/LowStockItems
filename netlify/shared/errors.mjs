@@ -74,3 +74,19 @@ export class ZohoAuthenticationError extends AppError {
 		super('ZOHO_AUTH_FAILED', message, 502);
 	}
 }
+
+/**
+ * Zoho is throttling token requests for this refresh token. Distinct from
+ * ZohoAuthenticationError on purpose: the credentials are fine, and saying
+ * otherwise sends people off to regenerate them — which does not lift a block.
+ */
+export class ZohoRateLimitedError extends AppError {
+	constructor(retryAfterSeconds = 300) {
+		super(
+			'ZOHO_RATE_LIMITED',
+			'Zoho is limiting how often a new access token can be requested. Try again in a few minutes.',
+			429,
+			{ retryAfterSeconds },
+		);
+	}
+}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Field from '../Field';
-import DatePicker from '../DatePicker';
 import Toggle from './Toggle';
+import { CALL_DIRECTIONS, CALL_OUTCOMES } from '../../lib/poFollowups';
 
 const field =
 	'w-full h-[38px] border border-line-2 rounded px-3 text-[13.5px] bg-surface text-body outline-none focus:border-brand transition-colors';
@@ -33,21 +33,21 @@ function toInstant(localValue) {
 
 const blank = () => ({
 	occurredLocal: toLocalInput(new Date()),
+	direction: 'outbound',
+	outcome: '',
 	details: '',
-	conclusion: '',
-	promisedDispatchDate: '',
-	promisedReadyDate: '',
 	needsFollowup: false,
 	nextFollowupLocal: '',
 	statusId: '',
 });
 
 /**
- * Record what a vendor said, and when to ring them again.
+ * Record how a vendor call went, and when to ring them again.
  *
- * The reminder is deliberately one field: the toggle reveals "Next follow-up
- * on" and nothing else here notifies. The promised dates are for the timeline
- * to show, so a missed promise is visible without also being an alarm.
+ * The outcome is picked from a fixed list rather than written, so calls can be
+ * compared across orders; anything that does not fit goes in Notes. The
+ * reminder is deliberately one field: the toggle reveals "Next follow-up on"
+ * and nothing else here notifies.
  */
 export default function CallLogForm({
 	reachable,
@@ -83,8 +83,12 @@ export default function CallLogForm({
 			next.occurredLocal = 'That is not a valid date and time.';
 		}
 
-		if (!form.details.trim() && !form.conclusion.trim()) {
-			next.conclusion = 'Record what was said, or how the call ended.';
+		if (!form.direction) {
+			next.direction = 'Was this call inbound or outbound?';
+		}
+
+		if (!form.outcome) {
+			next.outcome = 'Pick the outcome of the call.';
 		}
 
 		if (form.needsFollowup) {
@@ -106,10 +110,9 @@ export default function CallLogForm({
 
 		onSubmit({
 			occurredAt: toInstant(form.occurredLocal),
+			direction: form.direction,
+			outcome: form.outcome,
 			details: form.details.trim() || null,
-			conclusion: form.conclusion.trim() || null,
-			promisedDispatchDate: form.promisedDispatchDate || null,
-			promisedReadyDate: form.promisedReadyDate || null,
 			needsFollowup: form.needsFollowup,
 			// Sent as null when the toggle is off, so a value typed and then
 			// toggled away never becomes a reminder.
@@ -131,44 +134,48 @@ export default function CallLogForm({
 				/>
 			</Field>
 
-			<Field
-				label="What was said"
-				align="start"
-				hint="Who you spoke to, and what they told you.">
+			<Field label="Direction" required error={errors.direction}>
+				<div role="radiogroup" aria-label="Direction" className="flex items-center gap-5 min-h-[38px] flex-wrap">
+					{CALL_DIRECTIONS.map((d) => (
+						<label
+							key={d.value}
+							className="inline-flex items-center gap-2 text-[13.5px] text-body cursor-pointer">
+							<input
+								type="radio"
+								name="call-direction"
+								value={d.value}
+								checked={form.direction === d.value}
+								onChange={() => set({ direction: d.value })}
+								className="w-4 h-4 accent-brand cursor-pointer"
+							/>
+							{d.label}
+						</label>
+					))}
+				</div>
+			</Field>
+
+			<Field label="Outcome" required error={errors.outcome}>
+				<select
+					value={form.outcome}
+					onChange={(e) => set({ outcome: e.target.value })}
+					className={field}>
+					<option value="" disabled>
+						Select an outcome
+					</option>
+					{CALL_OUTCOMES.map((o) => (
+						<option key={o.value} value={o.value}>
+							{o.label}
+						</option>
+					))}
+				</select>
+			</Field>
+
+			<Field label="Notes" align="start">
 				<textarea
 					value={form.details}
 					onChange={(e) => set({ details: e.target.value })}
 					placeholder="Spoke to Ramesh in dispatch…"
 					className={area}
-				/>
-			</Field>
-
-			<Field
-				label="Conclusion"
-				align="start"
-				error={errors.conclusion}
-				hint="How the call ended — the line the timeline shows.">
-				<textarea
-					value={form.conclusion}
-					onChange={(e) => set({ conclusion: e.target.value })}
-					placeholder="Will confirm dispatch by Friday."
-					className={area}
-				/>
-			</Field>
-
-			<Field
-				label="Dispatch promised"
-				hint="Recorded for the timeline. It does not set a reminder.">
-				<DatePicker
-					value={form.promisedDispatchDate}
-					onChange={(v) => set({ promisedDispatchDate: v })}
-				/>
-			</Field>
-
-			<Field label="Goods ready by">
-				<DatePicker
-					value={form.promisedReadyDate}
-					onChange={(v) => set({ promisedReadyDate: v })}
 				/>
 			</Field>
 
@@ -223,7 +230,7 @@ export default function CallLogForm({
 						label="Next follow-up on"
 						required
 						error={errors.nextFollowupLocal}
-						hint="You will be reminded at this time. Nothing else on this form notifies.">
+						hint="You will be reminded at this time.">
 						<input
 							type="datetime-local"
 							min={minNext}

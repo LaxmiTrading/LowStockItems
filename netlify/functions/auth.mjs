@@ -269,7 +269,10 @@ async function loginActivity(request) {
 	await requireAdministrator(request);
 	const url = new URL(request.url);
 	return jsonSuccess(
-		{ attempts: await recentAttempts(url.searchParams.get('limit') ?? 50) },
+		await recentAttempts(
+			url.searchParams.get('limit') ?? 50,
+			url.searchParams.get('offset') ?? 0,
+		),
 		request,
 	);
 }

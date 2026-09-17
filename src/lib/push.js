@@ -169,3 +169,35 @@ export async function onForegroundMessage(handler) {
 		return () => {};
 	}
 }
+
+/**
+ * Show reminders that arrive while the app is the focused tab.
+ *
+ * Only for a browser that has already granted permission, so the SDK chunk is
+ * not loaded for anyone who never turned notifications on. Shown through the
+ * service worker rather than `new Notification`, so a click goes through the
+ * worker's notificationclick handler exactly as a background one does.
+ */
+export async function showForegroundReminders() {
+	if (!pushConfigured() || permissionState() !== 'granted') return () => {};
+
+	return onForegroundMessage(async (payload) => {
+		const title = payload?.notification?.title ?? 'Follow-up reminder';
+		const options = {
+			body: payload?.notification?.body ?? '',
+			icon: '/logo192.png',
+			badge: '/logo192.png',
+			data: { url: payload?.data?.url ?? '/purchase-orders' },
+		};
+		try {
+			const registration = await navigator.serviceWorker.getRegistration('/');
+			if (registration) {
+				await registration.showNotification(title, options);
+				return;
+			}
+			new Notification(title, options);
+		} catch {
+			/* nothing sensible to do if the browser refuses */
+		}
+	});
+}

@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { listPurchaseOrders } from '../components/ZohoAPI';
-import { listFollowups } from './poFollowups';
+import { listFollowups, reconcileFollowups } from './poFollowups';
 
 const IDLE = {
 	phase: 'idle', // idle | loading | done | error
@@ -41,6 +41,9 @@ function set(patch) {
 	for (const fn of listeners) fn();
 }
 
+const byOrder = (rows) =>
+	Object.fromEntries(rows.map((r) => [r.purchaseorderId, r]));
+
 export function getState() {
 	return state;
 }
@@ -48,6 +51,27 @@ export function getState() {
 export function subscribe(fn) {
 	listeners.add(fn);
 	return () => listeners.delete(fn);
+}
+
+/**
+ * Ask the server to forget follow-ups whose orders have closed, then pick up
+ * the result if it removed anything.
+ *
+ * Best-effort and silent: the server fetches the open list from Zoho itself
+ * rather than trusting this page's copy, refuses to delete on a partial fetch,
+ * and runs at most every few minutes however often the page loads. Nothing
+ * here is worth interrupting someone reading the list.
+ */
+async function reconcileAfterLoad(mine) {
+	try {
+		const result = await reconcileFollowups();
+		if (mine !== token || !result?.deleted) return;
+		const rows = await listFollowups();
+		if (mine !== token) return;
+		set({ followups: byOrder(rows) });
+	} catch {
+		/* the daily sweep is the backstop */
+	}
 }
 
 /**
@@ -87,10 +111,12 @@ export async function startLoad({ force = false } = {}) {
 		try {
 			const rows = await listFollowups();
 			if (mine !== token) return;
-			set({ followups: Object.fromEntries(rows.map((r) => [r.purchaseorderId, r])) });
+			set({ followups: byOrder(rows) });
 		} catch {
 			/* the orders are still worth showing */
 		}
+
+		reconcileAfterLoad(mine);
 	} catch (e) {
 		if (mine === token) {
 			set({

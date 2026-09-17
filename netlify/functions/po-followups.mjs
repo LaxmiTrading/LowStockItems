@@ -21,6 +21,9 @@ import {
 import { AppError, ValidationError } from '../shared/errors.mjs';
 import { queryMany, queryOne, withTransaction } from '../shared/db.mjs';
 import { requireAdministrator, requireUser } from '../shared/auth/session.mjs';
+import { PIPELINE_TONES, savePipelineStages } from '../shared/po/pipeline.mjs';
+import { reconcileFollowups } from '../shared/zoho/purchaseOrders.mjs';
+import { markRemindersChanged } from '../shared/po/reminderGate.mjs';
 
 /* ------------------------------------------------------------ validation */
 
@@ -32,7 +35,8 @@ const UUID_RE =
 // as a 500.
 const PO_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
-const TONES = new Set(['neutral', 'brand', 'ok', 'warn', 'danger']);
+// Every colour the pipeline accepts; shared with the pipeline save.
+const TONES = PIPELINE_TONES;
 
 function uuidField(body, field, { required = true } = {}) {
 	const value = body?.[field];
@@ -90,24 +94,22 @@ function instantField(body, field, { required = false } = {}) {
 	return parsed.toISOString();
 }
 
-/** A bare calendar date. Never converted — "they said Thursday" has no hour. */
-function dateField(body, field) {
+// Mirror the CHECKs 0007 puts on po_followup_events, so a bad value is a
+// named 400 rather than a constraint violation surfacing as a 500.
+const CALL_OUTCOMES = [
+	'goods_not_ready',
+	'production_delayed',
+	'dispatch_promised',
+	'dispatched',
+	'lr_awaiting',
+];
+const CALL_DIRECTIONS = ['inbound', 'outbound'];
+
+/** One of a fixed set of codes, always required. */
+function choiceField(body, field, allowed, message) {
 	const value = body?.[field];
-	if (value === undefined || value === null || value === '') return null;
-	if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-		throw new AppError('VALIDATION', `${field} must be a date.`, 400, { field });
-	}
-	// Rejects 2026-02-31, which the regex alone accepts.
-	const [y, m, d] = value.split('-').map(Number);
-	const probe = new Date(Date.UTC(y, m - 1, d));
-	if (
-		probe.getUTCFullYear() !== y ||
-		probe.getUTCMonth() !== m - 1 ||
-		probe.getUTCDate() !== d
-	) {
-		throw new AppError('VALIDATION', `${field} is not a real date.`, 400, {
-			field,
-		});
+	if (!allowed.includes(value)) {
+		throw new AppError('VALIDATION', message, 400, { field });
 	}
 	return value;
 }
@@ -139,12 +141,13 @@ const statusRow = (r) => ({
 	sortOrder: r.sort_order,
 	isInitial: r.is_initial,
 	isTerminal: r.is_terminal,
+	outcome: r.outcome ?? null,
 	archived: r.archived_at !== null,
 });
 
 async function readWorkflow() {
 	const statuses = await queryMany(
-		`SELECT id, name, tone, sort_order, is_initial, is_terminal, archived_at
+		`SELECT id, name, tone, sort_order, is_initial, is_terminal, outcome, archived_at
 		   FROM po_followup_statuses
 		  ORDER BY archived_at NULLS FIRST, sort_order, name`,
 	);
@@ -191,7 +194,7 @@ async function createStatus(request) {
 		 VALUES ($1, $2,
 		   COALESCE((SELECT MAX(sort_order) + 10 FROM po_followup_statuses), 10),
 		   $3, $4)
-		 RETURNING id, name, tone, sort_order, is_initial, is_terminal, archived_at`,
+		 RETURNING id, name, tone, sort_order, is_initial, is_terminal, outcome, archived_at`,
 		[name, tone, body.isInitial === true, body.isTerminal === true],
 	);
 
@@ -246,7 +249,7 @@ async function updateStatus(request) {
 		        is_terminal = COALESCE($6, is_terminal),
 		        updated_at  = NOW()
 		  WHERE id = $1
-		  RETURNING id, name, tone, sort_order, is_initial, is_terminal, archived_at`,
+		  RETURNING id, name, tone, sort_order, is_initial, is_terminal, outcome, archived_at`,
 		[
 			id,
 			name,
@@ -449,6 +452,8 @@ const eventRow = (r) => ({
 	id: r.id,
 	kind: r.kind,
 	occurredAt: r.occurred_at,
+	outcome: r.outcome,
+	direction: r.direction,
 	details: r.details,
 	conclusion: r.conclusion,
 	promisedDispatchDate: r.promised_dispatch_date,
@@ -645,10 +650,14 @@ async function readEventFields(body) {
 	const needsFollowup = body.needsFollowup === true;
 	return {
 		occurredAt: instantField(body, 'occurredAt', { required: true }),
+		outcome: choiceField(body, 'outcome', CALL_OUTCOMES, 'Pick the outcome of the call.'),
+		direction: choiceField(
+			body,
+			'direction',
+			CALL_DIRECTIONS,
+			'Say whether this was an inbound or an outbound call.',
+		),
 		details: optionalText(body, 'details', 4000),
-		conclusion: optionalText(body, 'conclusion', 2000),
-		promisedDispatchDate: dateField(body, 'promisedDispatchDate'),
-		promisedReadyDate: dateField(body, 'promisedReadyDate'),
 		needsFollowup,
 		// Forced null when the toggle is off: the form hides the field rather
 		// than clearing it, so a stale value would otherwise be saved.
@@ -656,15 +665,6 @@ async function readEventFields(body) {
 			? instantField(body, 'nextFollowupAt', { required: true })
 			: null,
 	};
-}
-
-function assertSomethingSaid(fields) {
-	if (!fields.details && !fields.conclusion) {
-		throw new ValidationError(
-			'Record what was said on the call, or how it ended.',
-			{ field: 'conclusion' },
-		);
-	}
 }
 
 function assertReminderInFuture(fields) {
@@ -684,11 +684,15 @@ async function logCall(request) {
 	body.purchaseorderId = purchaseOrderId(body);
 
 	const fields = await readEventFields(body);
-	assertSomethingSaid(fields);
 	assertReminderInFuture(fields);
 
 	const targetStatusId = uuidField(body, 'statusId', { required: false });
 
+	// Marked on both sides of the write: before, so a timeout between the
+	// commit and the second mark cannot leave the sweep blind to this reminder;
+	// after, so a sweep that read the gate mid-transaction cannot record a
+	// "next due" that predates it.
+	await markRemindersChanged();
 	const result = await withTransaction(async (run) => {
 		const followup = await upsertFollowup(run, body, actor.id);
 
@@ -711,19 +715,17 @@ async function logCall(request) {
 		const event = (
 			await run(
 				`INSERT INTO po_followup_events
-				   (followup_id, kind, occurred_at, details, conclusion,
-				    promised_dispatch_date, promised_ready_date,
+				   (followup_id, kind, occurred_at, outcome, direction, details,
 				    needs_followup, next_followup_at,
 				    from_status_id, to_status_id, forced, created_by)
-				 VALUES ($1, 'call', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+				 VALUES ($1, 'call', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 				 RETURNING id`,
 				[
 					followup.id,
 					fields.occurredAt,
+					fields.outcome,
+					fields.direction,
 					fields.details,
-					fields.conclusion,
-					fields.promisedDispatchDate,
-					fields.promisedReadyDate,
 					fields.needsFollowup,
 					fields.nextFollowupAt,
 					moving ? followup.status_id : null,
@@ -745,6 +747,7 @@ async function logCall(request) {
 		await recomputeNextFollowup(run, followup.id);
 		return { followupId: followup.id, eventId: event.id };
 	});
+	await markRemindersChanged();
 
 	const fresh = await queryOne(
 		`${FOLLOWUP_SELECT} WHERE f.purchaseorder_id = $1`,
@@ -827,29 +830,31 @@ async function updateCall(request) {
 	assertMayEdit(existing, actor);
 
 	const fields = await readEventFields(body);
-	assertSomethingSaid(fields);
 	assertReminderInFuture(fields);
 
+	await markRemindersChanged();
 	await withTransaction(async (run) => {
+		// The conclusion and promised dates of a call logged before 0007 are
+		// left as they were: the form no longer shows them, so it cannot be
+		// allowed to wipe them.
 		await run(
 			`UPDATE po_followup_events
-			    SET occurred_at = $2, details = $3, conclusion = $4,
-			        promised_dispatch_date = $5, promised_ready_date = $6,
-			        needs_followup = $7, next_followup_at = $8
+			    SET occurred_at = $2, outcome = $3, direction = $4, details = $5,
+			        needs_followup = $6, next_followup_at = $7
 			  WHERE id = $1`,
 			[
 				eventId,
 				fields.occurredAt,
+				fields.outcome,
+				fields.direction,
 				fields.details,
-				fields.conclusion,
-				fields.promisedDispatchDate,
-				fields.promisedReadyDate,
 				fields.needsFollowup,
 				fields.nextFollowupAt,
 			],
 		);
 		await recomputeNextFollowup(run, existing.followup_id);
 	});
+	await markRemindersChanged();
 
 	const fresh = await queryOne(
 		`${FOLLOWUP_SELECT} WHERE f.purchaseorder_id = $1`,
@@ -875,10 +880,12 @@ async function deleteCall(request) {
 	if (!existing) throw new AppError('NOT_FOUND', 'No such call.', 404);
 	assertMayEdit(existing, actor);
 
+	await markRemindersChanged();
 	await withTransaction(async (run) => {
 		await run(`DELETE FROM po_followup_events WHERE id = $1`, [eventId]);
 		await recomputeNextFollowup(run, existing.followup_id);
 	});
+	await markRemindersChanged();
 
 	const fresh = await queryOne(
 		`${FOLLOWUP_SELECT} WHERE f.purchaseorder_id = $1`,
@@ -939,6 +946,34 @@ async function unregisterDevice(request) {
 	return jsonSuccess({ removed: true }, request);
 }
 
+/* --------------------------------------------------------- the pipeline */
+
+/**
+ * Save the whole pipeline in one request — names, colours, order, the
+ * default stage and the won/lost outcomes — the way the Customize Pipeline
+ * dialog edits it. The work is in ../shared/po/pipeline.mjs.
+ */
+async function savePipeline(request) {
+	await requireAdministrator(request);
+	const body = await readJson(request);
+	const summary = await savePipelineStages(body.stages);
+	return jsonSuccess({ ...(await readWorkflow()), ...summary }, request);
+}
+
+/**
+ * Forget follow-ups whose purchase orders are no longer open in Zoho.
+ *
+ * Called by the Purchase Orders page after it loads. The server reads the
+ * open list from Zoho itself rather than trusting the page, refuses to
+ * delete on a partial fetch, and sweeps at most every ten minutes however
+ * often it is asked.
+ */
+async function reconcile(request) {
+	await requireUser(request);
+	const result = await reconcileFollowups({ minIntervalMs: 10 * 60_000, trigger: 'page' });
+	return jsonSuccess(result, request);
+}
+
 /* ------------------------------------------------------------------ route */
 
 const routes = [
@@ -947,12 +982,14 @@ const routes = [
 	{ method: 'PUT', pattern: '/api/po/workflow/statuses', handler: updateStatus },
 	{ method: 'DELETE', pattern: '/api/po/workflow/statuses', handler: deleteStatus },
 	{ method: 'PUT', pattern: '/api/po/workflow/transitions', handler: replaceTransitions },
+	{ method: 'PUT', pattern: '/api/po/workflow/pipeline', handler: savePipeline },
 	{ method: 'GET', pattern: '/api/po/followups', handler: listFollowups },
 	{ method: 'GET', pattern: '/api/po/followups/detail', handler: followupDetail },
 	{ method: 'POST', pattern: '/api/po/followups/status', handler: setStatus },
 	{ method: 'POST', pattern: '/api/po/followups/calls', handler: logCall },
 	{ method: 'PUT', pattern: '/api/po/followups/calls', handler: updateCall },
 	{ method: 'DELETE', pattern: '/api/po/followups/calls', handler: deleteCall },
+	{ method: 'POST', pattern: '/api/po/followups/reconcile', handler: reconcile },
 	{ method: 'POST', pattern: '/api/push/devices', handler: registerDevice },
 	{ method: 'DELETE', pattern: '/api/push/devices', handler: unregisterDevice },
 ];
@@ -970,10 +1007,12 @@ export const config = {
 		'/api/po/workflow',
 		'/api/po/workflow/statuses',
 		'/api/po/workflow/transitions',
+		'/api/po/workflow/pipeline',
 		'/api/po/followups',
 		'/api/po/followups/detail',
 		'/api/po/followups/status',
 		'/api/po/followups/calls',
+		'/api/po/followups/reconcile',
 		'/api/push/devices',
 	],
 };

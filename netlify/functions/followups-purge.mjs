@@ -1,33 +1,20 @@
 /**
- * Forget the orders that are finished.
+ * The daily sweep that forgets purchase orders which are no longer open.
  *
- * Once a purchase order is billed, closed or cancelled there is nothing left
- * to chase, and by the decision taken for this feature its follow-up state and
- * call history are deleted outright rather than archived.
+ * The rule itself lives in ../shared/zoho/purchaseOrders.mjs, because the
+ * Purchase Orders page triggers the same sweep after it loads. Follow-up
+ * status never deletes anything — a stage marked won or lost is part of the
+ * record. What removes a follow-up is its order leaving Zoho's open and draft
+ * lists, which is what billing, closing or cancelling it does.
  *
- * That is irreversible and unattended, which dictates how it is written:
+ * This schedule is the backstop for days when nobody opens the page.
  *
- *  · A row is deleted only when Zoho has been asked about that specific order
- *    and has answered with a final status. Absence from a list is never
- *    treated as evidence — a half-drained pagination loop or a transient error
- *    looks exactly like "it is no longer open", and reading that as "received"
- *    would destroy months of call history in a single bad run.
- *  · The PO numbers deleted are logged, because the function log is the only
- *    record that will exist afterwards.
- *
- * Runs daily rather than every quarter hour: it costs one Zoho call per
- * tracked order and shares the organisation's rate limit with people using the
- * app.
+ * Scheduled functions are still reachable at their URL and have no session to
+ * check, so anything that is not Netlify's own scheduled invocation must
+ * present CRON_SECRET, and gets a 404 otherwise.
  */
 
-import { queryMany, query } from '../shared/db.mjs';
-import { getAccessToken, requireResolvedCredentials } from '../shared/zoho/tokens.mjs';
-
-// What Zoho calls an order that is done with. `received` is included for
-// organisations that track receipts; the rest are Zoho Books' own vocabulary.
-const FINAL = new Set(['billed', 'closed', 'cancelled', 'received', 'void']);
-
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+import { reconcileFollowups } from '../shared/zoho/purchaseOrders.mjs';
 
 function authorised(request) {
 	if (request.headers.get('x-netlify-event') === 'schedule') return true;
@@ -39,91 +26,9 @@ export default async (request) => {
 	if (!authorised(request)) return new Response('Not found', { status: 404 });
 
 	try {
-		const tracked = await queryMany(
-			`SELECT purchaseorder_id, purchaseorder_number FROM po_followups`,
-		);
-		if (tracked.length === 0) {
-			return Response.json({ ok: true, data: { checked: 0, deleted: 0 } });
-		}
-
-		const credentials = await requireResolvedCredentials();
-		// getAccessToken hands back the token *and* the data centre it is valid
-		// against. Interpolating the whole object sent "[object Object]" as the
-		// token, every read 401'd, and the purge silently deleted nothing.
-		const { accessToken, apiDomain } = await getAccessToken();
-
-		const purged = [];
-		let checked = 0;
-		let unreadable = 0;
-
-		for (const row of tracked) {
-			try {
-				const res = await fetch(
-					`${apiDomain}/books/v3/purchaseorders/${encodeURIComponent(row.purchaseorder_id)}` +
-						`?organization_id=${encodeURIComponent(credentials.organizationId)}`,
-					{ headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } },
-				);
-
-				// 404 means Zoho no longer has the order at all — deleted at the
-				// source. That IS a positive answer, so the local row goes too.
-				if (res.status === 404) {
-					purged.push(row);
-					checked++;
-					await delay(300);
-					continue;
-				}
-
-				if (!res.ok) {
-					// Anything else — a 429, a 500, an expired token — is not an
-					// answer about this order, so it is left exactly as it is.
-					unreadable++;
-					await delay(300);
-					continue;
-				}
-
-				const body = await res.json();
-				const status = String(body?.purchaseorder?.status ?? '').toLowerCase();
-				checked++;
-
-				if (status && FINAL.has(status)) purged.push(row);
-			} catch (error) {
-				unreadable++;
-				console.error('[followups-purge] could not read order', {
-					purchaseorder_id: row.purchaseorder_id,
-					message: error?.message,
-				});
-			}
-
-			// The same pacing every batch read in this codebase uses.
-			await delay(300);
-		}
-
-		if (purged.length > 0) {
-			// ON DELETE CASCADE on po_followup_events takes the timeline with it.
-			await query(
-				`DELETE FROM po_followups WHERE purchaseorder_id = ANY($1::text[])`,
-				[purged.map((p) => p.purchaseorder_id)],
-			);
-		}
-
-		// The only surviving record of what was removed.
-		console.log('[followups-purge]', {
-			tracked: tracked.length,
-			checked,
-			unreadable,
-			deleted: purged.length,
-			numbers: purged.map((p) => p.purchaseorder_number ?? p.purchaseorder_id),
-		});
-
-		return Response.json({
-			ok: true,
-			data: {
-				tracked: tracked.length,
-				checked,
-				unreadable,
-				deleted: purged.length,
-			},
-		});
+		const result = await reconcileFollowups({ minIntervalMs: 0, trigger: 'schedule' });
+		console.log('[followups-purge]', result);
+		return Response.json({ ok: true, data: result });
 	} catch (error) {
 		console.error('[followups-purge] run failed', { message: error?.message });
 		return Response.json(

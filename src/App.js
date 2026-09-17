@@ -11,6 +11,7 @@ import LoginPage from './pages/LoginPage';
 import AcceptInvitePage from './pages/AcceptInvitePage';
 import SettingsPage from './pages/SettingsPage';
 import { AuthProvider, useAuth } from './lib/auth';
+import { showForegroundReminders } from './lib/push';
 import { ThemeProvider } from './lib/theme';
 
 /**
@@ -48,6 +49,22 @@ function Protected() {
 		window.addEventListener('lsi:signed-out', onSignedOut);
 		return () => window.removeEventListener('lsi:signed-out', onSignedOut);
 	}, [signOut]);
+
+	// A reminder pushed while this tab is focused is not displayed by the
+	// browser, so it has to be shown from here.
+	useEffect(() => {
+		if (phase !== 'authenticated') return undefined;
+		let unsubscribe = () => {};
+		let cancelled = false;
+		showForegroundReminders().then((stop) => {
+			if (cancelled) stop();
+			else unsubscribe = stop;
+		});
+		return () => {
+			cancelled = true;
+			unsubscribe();
+		};
+	}, [phase]);
 
 	if (phase === 'loading') {
 		return (

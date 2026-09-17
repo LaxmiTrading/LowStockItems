@@ -12,16 +12,20 @@ import {
 	startLoad,
 	applyFollowup,
 } from '../lib/poRun';
+import { getWorkflow, setFollowupStatus } from '../lib/poFollowups';
+import { useAuth } from '../lib/auth';
 import { StatusPill } from '../components/po/FollowUpTimeline';
 import PurchaseOrderPanel, {
 	poStatusTone,
 } from '../components/po/PurchaseOrderPanel';
+import PoRowActions from '../components/po/PoRowActions';
+import LogCallModal from '../components/po/LogCallModal';
 import Pagination from '../components/Pagination';
 import MetricCard from '../components/MetricCard';
 import { useIsDesktop } from '../lib/useMediaQuery';
 
 const COLS =
-	'100px 120px minmax(0,1.6fr) 96px minmax(0,1.1fr) 130px minmax(0,110px)';
+	'100px 120px minmax(0,1.6fr) 96px minmax(0,1.1fr) 130px minmax(0,110px) 44px';
 
 const money = (v) =>
 	'₹' +
@@ -72,12 +76,18 @@ export default function PurchaseOrdersPage() {
 	const run = useSyncExternalStore(subscribeToPOs, getPOState);
 	const isDesktop = useIsDesktop();
 	const [searchParams] = useSearchParams();
+	const { user } = useAuth();
+	const isAdmin = user?.role === 'administrator';
 
 	const [search, setSearch] = useState('');
 	const [filter, setFilter] = useState('all');
 	const [openOrder, setOpenOrder] = useState(null);
 	const [page, setPage] = useState(0);
 	const [pageSize, setPageSize] = useState(50);
+	const [workflow, setWorkflow] = useState(null);
+	const [callFor, setCallFor] = useState(null);
+	const [busyId, setBusyId] = useState(null);
+	const [actionError, setActionError] = useState(null);
 	const searchRef = useRef(null);
 
 	// No-ops when a load is already running or has finished, so returning to the
@@ -86,8 +96,22 @@ export default function PurchaseOrdersPage() {
 		startLoad();
 	}, []);
 
-	// Opening one order straight from a link — what the follow-up reminder will
-	// point at once notifications land.
+	// The row menus offer only the moves the pipeline allows, so they need it.
+	useEffect(() => {
+		let cancelled = false;
+		getWorkflow()
+			.then((wf) => {
+				if (!cancelled) setWorkflow(wf);
+			})
+			.catch(() => {
+				/* the menu says "Loading…" rather than breaking the list */
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	// Opening one order straight from a link — what a follow-up reminder points at.
 	const wantedId = searchParams.get('po');
 	useEffect(() => {
 		if (!wantedId) return;
@@ -150,6 +174,52 @@ export default function PurchaseOrdersPage() {
 
 	const loading = run.phase === 'loading';
 	const showSkeleton = loading && run.orders.length === 0;
+
+	// Rows are not <button>s: each carries its own action menu, and a button
+	// inside a button is invalid and swallows clicks. Keyboard users still open
+	// a row with Enter or Space — but only when the row itself has focus, so
+	// pressing Enter on the menu button does not also open the panel.
+	const rowKeyDown = (o) => (e) => {
+		if (e.target !== e.currentTarget) return;
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			setOpenOrder(o);
+		}
+	};
+
+	const changeStatus = async (o, statusId, force) => {
+		setActionError(null);
+		setBusyId(o.purchaseorder_id);
+		try {
+			const data = await setFollowupStatus({
+				purchaseorderId: o.purchaseorder_id,
+				purchaseorderNumber: o.purchaseorder_number,
+				vendorId: o.vendor_id,
+				vendorName: o.vendor_name,
+				statusId,
+				force,
+			});
+			applyFollowup(o.purchaseorder_id, data.followup);
+		} catch (e) {
+			setActionError(
+				`${o.purchaseorder_number}: ${e.message || 'Could not change the status.'}`,
+			);
+		} finally {
+			setBusyId(null);
+		}
+	};
+
+	const actionsFor = (o, fu) => (
+		<PoRowActions
+			workflow={workflow}
+			followup={fu}
+			isAdmin={isAdmin}
+			busy={busyId === o.purchaseorder_id}
+			onView={() => setOpenOrder(o)}
+			onLogCall={() => setCallFor(o)}
+			onChangeStatus={(statusId, force) => changeStatus(o, statusId, force)}
+		/>
+	);
 
 	return (
 		<div className="px-4 sm:px-6 lg:px-7 pt-5 lg:pt-6 pb-[70px] max-w-[1400px]">
@@ -232,6 +302,18 @@ export default function PurchaseOrdersPage() {
 						onClick={() => startLoad({ force: true })}
 						className="h-8 px-3 rounded border border-danger-border bg-surface text-danger text-[12.5px] font-bold cursor-pointer hover:bg-danger-bg">
 						Try again
+					</button>
+				</div>
+			)}
+
+			{actionError && (
+				<div className="px-4 py-3 mb-4 rounded border bg-danger-bg border-danger-border text-danger text-[13px] flex items-center justify-between gap-3 animate-fade-in">
+					<span>{actionError}</span>
+					<button
+						onClick={() => setActionError(null)}
+						aria-label="Dismiss"
+						className="bg-transparent border-none cursor-pointer text-current opacity-70 hover:opacity-100">
+						&#10005;
 					</button>
 				</div>
 			)}
@@ -321,6 +403,9 @@ export default function PurchaseOrdersPage() {
 					<div>FOLLOW-UP</div>
 					<div>NEXT CALL</div>
 					<div className="text-right pr-2.5">AMOUNT</div>
+					<div>
+						<span className="sr-only">Actions</span>
+					</div>
 				</div>
 
 				{showSkeleton ? (
@@ -341,6 +426,7 @@ export default function PurchaseOrdersPage() {
 									<div className="skeleton h-4 w-20 rounded-full" />
 									<div className="skeleton h-3.5 w-2/3" />
 									<div className="skeleton h-3.5 w-3/4 justify-self-end" />
+									<div className="skeleton h-6 w-6 rounded justify-self-end" />
 								</div>
 							) : (
 								<div key={i} className="px-4 py-3 border-b border-line-4">
@@ -397,13 +483,19 @@ export default function PurchaseOrdersPage() {
 							const overdue = fu?.nextFollowupAt
 								? new Date(fu.nextFollowupAt).getTime() < Date.now()
 								: false;
+							const busy = busyId === o.purchaseorder_id;
 
 							return isDesktop ? (
-								<button
+								<div
 									key={o.purchaseorder_id}
+									role="button"
+									tabIndex={0}
 									onClick={() => setOpenOrder(o)}
+									onKeyDown={rowKeyDown(o)}
 									style={{ gridTemplateColumns: COLS, '--i': Math.min(i, 20) }}
-									className="group w-full text-left grid px-[18px] py-[13px] border-0 border-b border-line-4 last:border-b-0 text-[13.5px] items-center bg-surface hover:bg-brand-50/50 transition-colors duration-150 cursor-pointer">
+									className={`group grid px-[18px] py-[9px] border-b border-line-4 last:border-b-0 text-[13.5px] items-center bg-surface hover:bg-brand-50/50 focus-visible:bg-brand-50/60 outline-none transition-colors duration-150 cursor-pointer ${
+										busy ? 'opacity-60' : ''
+									}`}>
 									<div className="text-body-3 num text-[12.5px]">
 										{fmtDate(o.date)}
 									</div>
@@ -437,21 +529,36 @@ export default function PurchaseOrdersPage() {
 									<div className="text-right pr-2.5 num font-bold text-heading">
 										{money(o.total)}
 									</div>
-								</button>
+									<div
+										className="flex justify-end"
+										onClick={(e) => e.stopPropagation()}>
+										{actionsFor(o, fu)}
+									</div>
+								</div>
 							) : (
-								<button
+								<div
 									key={o.purchaseorder_id}
+									role="button"
+									tabIndex={0}
 									onClick={() => setOpenOrder(o)}
+									onKeyDown={rowKeyDown(o)}
 									style={{ '--i': Math.min(i, 20) }}
-									className="w-full text-left px-4 py-3 border-0 border-b border-line-4 last:border-b-0 bg-surface active:bg-brand-50/50 cursor-pointer">
+									className={`px-4 py-3 border-b border-line-4 last:border-b-0 bg-surface active:bg-brand-50/50 outline-none cursor-pointer ${
+										busy ? 'opacity-60' : ''
+									}`}>
 									<div className="flex items-center justify-between gap-2">
 										<span className="font-bold text-link num text-[13.5px] truncate">
 											{o.purchaseorder_number}
 										</span>
-										<span
-											className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border flex-shrink-0 ${poStatusTone(o.status)}`}>
-											{statusLabel(o.status)}
-										</span>
+										<div className="flex items-center gap-1 flex-shrink-0">
+											<span
+												className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${poStatusTone(o.status)}`}>
+												{statusLabel(o.status)}
+											</span>
+											<div onClick={(e) => e.stopPropagation()}>
+												{actionsFor(o, fu)}
+											</div>
+										</div>
 									</div>
 									<div className="text-[13px] text-body mt-1 truncate">
 										{o.vendor_name}
@@ -484,7 +591,7 @@ export default function PurchaseOrdersPage() {
 											{money(o.total)}
 										</span>
 									</div>
-								</button>
+								</div>
 							);
 						})}
 					</div>
@@ -521,6 +628,16 @@ export default function PurchaseOrdersPage() {
 						applyFollowup(openOrder.purchaseorder_id, fresh)
 					}
 					onClose={() => setOpenOrder(null)}
+				/>
+			)}
+
+			{callFor && (
+				<LogCallModal
+					order={callFor}
+					workflow={workflow}
+					followup={run.followups[callFor.purchaseorder_id]}
+					onClose={() => setCallFor(null)}
+					onSaved={(fresh) => applyFollowup(callFor.purchaseorder_id, fresh)}
 				/>
 			)}
 		</div>

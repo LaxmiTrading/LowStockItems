@@ -433,16 +433,12 @@ export default function AppShell() {
 
 					{!collapsed && (
 						<div className="mx-1 mb-2 rounded border border-line bg-surface p-3">
-							<div className="flex items-center gap-2 mb-1.5">
+							<div className="flex items-center gap-2">
 								<span className="w-1.5 h-1.5 rounded-full bg-ok" />
 								<span className="text-[10.5px] font-black text-body-3 tracking-[.06em]">
 									CONNECTED TO ZOHO
 								</span>
 							</div>
-							<p className="m-0 text-[11.5px] leading-[1.45] text-muted-2">
-								Stock, vendors and purchase orders read live through the server.
-								No Zoho credential reaches this browser.
-							</p>
 						</div>
 					)}
 

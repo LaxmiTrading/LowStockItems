@@ -174,14 +174,32 @@ export async function enforceLoginLimit({ email, origin }) {
 /* ------------------------------------------------------------- reporting */
 
 /** The administrator's view: what has been tried lately, and from where. */
-export async function recentAttempts(limit = 50) {
-	return queryMany(
+export async function recentAttempts(limit = 50, offset = 0) {
+	const pageSize = Math.min(Math.max(Number(limit) || 50, 1), 200);
+	const skip = Math.min(Math.max(Number(offset) || 0, 0), 1_000_000);
+
+	// id breaks ties between attempts in the same instant, so stepping through
+	// pages never shows a row twice or skips one.
+	const attempts = await queryMany(
 		`SELECT at, email, ip, country, city, outcome
 		   FROM login_attempts
-		  ORDER BY at DESC
-		  LIMIT $1`,
-		[Math.min(Math.max(Number(limit) || 50, 1), 200)],
+		  ORDER BY at DESC, id DESC
+		  LIMIT $1 OFFSET $2`,
+		[pageSize, skip],
 	);
+	const [counts] = await queryMany(
+		`SELECT COUNT(*)::int AS total,
+		        COUNT(*) FILTER (WHERE outcome <> 'success')::int AS failed
+		   FROM login_attempts`,
+	);
+
+	return {
+		attempts,
+		total: counts.total,
+		failed: counts.failed,
+		limit: pageSize,
+		offset: skip,
+	};
 }
 
 /**
