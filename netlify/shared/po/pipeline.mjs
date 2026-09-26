@@ -11,8 +11,9 @@
 
 import { withTransaction } from '../db.mjs';
 import { AppError, ValidationError } from '../errors.mjs';
+import { recomputeAllStageFollowups } from './reminders.mjs';
 
-/** Mirrors po_followup_statuses_tone_known (migration 0006). */
+/** Mirrors po_followup_statuses_tone_known (migrations 0006 and 0008). */
 export const PIPELINE_TONES = new Set([
 	'slate', 'red', 'orange', 'amber', 'yellow', 'green',
 	'teal', 'cyan', 'blue', 'indigo', 'violet', 'pink',
@@ -20,8 +21,24 @@ export const PIPELINE_TONES = new Set([
 	'neutral', 'brand', 'ok', 'warn', 'danger',
 ]);
 
+/**
+ * A palette name, or a custom #rrggbb from the colour wheel. Returns the form
+ * to store — hex lowercased, as the CHECK requires — or null when it is
+ * neither.
+ */
+export function cleanTone(tone) {
+	if (PIPELINE_TONES.has(tone)) return tone;
+	if (typeof tone === 'string' && /^#[0-9a-f]{6}$/i.test(tone)) {
+		return tone.toLowerCase();
+	}
+	return null;
+}
+
 const OUTCOMES = new Set(['won', 'lost']);
+const ANCHORS = new Set(['promise', 'stage']);
 const MAX_STAGES = 50;
+const MAX_CHASE_DAYS = 365;
+const MAX_CHASE_NOTE = 160;
 
 const UUID_RE =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -58,8 +75,8 @@ function cleanStages(stages) {
 		}
 		seen.add(key);
 
-		const tone = stage.tone ?? 'slate';
-		if (!PIPELINE_TONES.has(tone)) {
+		const tone = cleanTone(stage.tone ?? 'slate');
+		if (tone === null) {
 			throw new ValidationError(`"${name}" has a colour this app does not know.`, {
 				field: 'tone',
 				index,
@@ -82,11 +99,45 @@ function cleanStages(stages) {
 			});
 		}
 
+		// "Chase if an order is still here after N days." Mirrors
+		// po_followup_statuses_chase_sane so a bad value is a named 400 rather
+		// than a constraint violation surfacing as a 500.
+		const rawDays = stage.chaseAfterDays;
+		const chaseAfterDays =
+			rawDays === null || rawDays === undefined || rawDays === '' ? null : rawDays;
+		if (chaseAfterDays !== null) {
+			if (!Number.isInteger(chaseAfterDays) || chaseAfterDays < 0 || chaseAfterDays > MAX_CHASE_DAYS) {
+				throw new ValidationError(
+					`"${name}" needs a whole number of days between 0 and ${MAX_CHASE_DAYS}.`,
+					{ field: 'chaseAfterDays', index },
+				);
+			}
+			if (outcome !== null) {
+				throw new ValidationError(
+					`"${name}" ends the chase, so there is nothing left to chase it for.`,
+					{ field: 'chaseAfterDays', index },
+				);
+			}
+		}
+
+		const chaseAnchor = ANCHORS.has(stage.chaseAnchor) ? stage.chaseAnchor : 'stage';
+
+		const chaseNote = typeof stage.chaseNote === 'string' ? stage.chaseNote.trim() : '';
+		if (chaseNote.length > MAX_CHASE_NOTE) {
+			throw new ValidationError(
+				`The reminder wording for "${name}" is too long.`,
+				{ field: 'chaseNote', index },
+			);
+		}
+
 		return {
 			id,
 			name,
 			tone,
 			outcome,
+			chaseAfterDays,
+			chaseAnchor,
+			chaseNote: chaseNote || null,
 			isDefault: stage.isDefault === true,
 			sortOrder: (index + 1) * 10,
 		};
@@ -199,18 +250,26 @@ export async function savePipelineStages(stages) {
 					`UPDATE po_followup_statuses
 					    SET name = $2, tone = $3, sort_order = $4, is_initial = $5,
 					        outcome = $6, is_terminal = ($6::text IS NOT NULL),
+					        chase_after_days = $7, chase_anchor = $8, chase_note = $9,
 					        updated_at = NOW()
 					  WHERE id = $1`,
-					[stage.id, stage.name, stage.tone, stage.sortOrder, stage.isDefault, stage.outcome],
+					[
+						stage.id, stage.name, stage.tone, stage.sortOrder, stage.isDefault,
+						stage.outcome, stage.chaseAfterDays, stage.chaseAnchor, stage.chaseNote,
+					],
 				);
 			} else {
 				const { id } = (
 					await run(
 						`INSERT INTO po_followup_statuses
-						   (name, tone, sort_order, is_initial, outcome, is_terminal)
-						 VALUES ($1, $2, $3, $4, $5, ($5::text IS NOT NULL))
+						   (name, tone, sort_order, is_initial, outcome, is_terminal,
+						    chase_after_days, chase_anchor, chase_note)
+						 VALUES ($1, $2, $3, $4, $5, ($5::text IS NOT NULL), $6, $7, $8)
 						 RETURNING id`,
-						[stage.name, stage.tone, stage.sortOrder, stage.isDefault, stage.outcome],
+						[
+							stage.name, stage.tone, stage.sortOrder, stage.isDefault, stage.outcome,
+							stage.chaseAfterDays, stage.chaseAnchor, stage.chaseNote,
+						],
 					)
 				).rows[0];
 				added.push({ id, outcome: stage.outcome });
@@ -240,6 +299,13 @@ export async function savePipelineStages(stages) {
 			}
 		}
 
-		return { archived, deleted, added: added.length };
+		// 5. Re-date every order whose stage chases. The chase days are
+		//    configuration but the due they imply is *stored*, so turning
+		//    "nudge me after four days" into two has to move the orders already
+		//    sitting there — otherwise the change quietly takes effect only on
+		//    whatever gets touched next, which is the subset that needed it least.
+		const redated = await recomputeAllStageFollowups(run);
+
+		return { archived, deleted, added: added.length, redated };
 	});
 }

@@ -9,6 +9,8 @@
  * fail it.
  */
 
+import { dueReason, formatIst } from '../po/dueMessage.mjs';
+
 const ENDPOINT = 'https://api.resend.com/emails';
 
 export function emailConfigured() {
@@ -59,31 +61,31 @@ const escapeHtml = (s) =>
  * One message listing everything that came due, never one per order — five
  * overdue vendors must not be five emails.
  *
- * Every time is formatted in Asia/Kolkata explicitly. The function runs in UTC,
- * so without this a follow-up set for 11:30 would read as 06:00 to the person
- * who set it.
+ * Every time is formatted in Asia/Kolkata explicitly — by the shared formatter
+ * in ../po/dueMessage.mjs, which the push sender uses too. The function runs in
+ * UTC, so without this a follow-up set for 11:30 would read as 06:00 to the
+ * person who set it.
  */
 export function renderDueDigest(items, baseUrl) {
-	const when = (iso) =>
-		new Date(iso).toLocaleString('en-IN', {
-			timeZone: 'Asia/Kolkata',
-			day: '2-digit',
-			month: 'short',
-			hour: '2-digit',
-			minute: '2-digit',
-		});
+	const when = formatIst;
 
 	const rows = items
 		.map((item) => {
 			const link = `${baseUrl}/purchase-orders?po=${encodeURIComponent(item.purchaseorder_id)}`;
+			// The reason goes under the vendor rather than in a fifth column:
+			// four is already as many as reads on a phone.
+			const reason = dueReason(item);
 			return `
 				<tr>
-					<td style="padding:10px 12px;border-bottom:1px solid #e6e8eb;font-weight:700">
+					<td style="padding:10px 12px;border-bottom:1px solid #e6e8eb;font-weight:700;vertical-align:top">
 						<a href="${link}" style="color:#2f7be0;text-decoration:none">${escapeHtml(item.purchaseorder_number ?? '—')}</a>
 					</td>
-					<td style="padding:10px 12px;border-bottom:1px solid #e6e8eb">${escapeHtml(item.vendor_name ?? '—')}</td>
-					<td style="padding:10px 12px;border-bottom:1px solid #e6e8eb;color:#8b919a">${escapeHtml(item.status_name ?? '—')}</td>
-					<td style="padding:10px 12px;border-bottom:1px solid #e6e8eb;white-space:nowrap">${when(item.next_followup_at)}</td>
+					<td style="padding:10px 12px;border-bottom:1px solid #e6e8eb;vertical-align:top">
+						${escapeHtml(item.vendor_name ?? '—')}
+						<div style="font-size:12px;color:#8b919a;margin-top:2px">${escapeHtml(reason)}</div>
+					</td>
+					<td style="padding:10px 12px;border-bottom:1px solid #e6e8eb;color:#8b919a;vertical-align:top">${escapeHtml(item.status_name ?? '—')}</td>
+					<td style="padding:10px 12px;border-bottom:1px solid #e6e8eb;white-space:nowrap;vertical-align:top">${when(item.next_followup_at)}</td>
 				</tr>`;
 		})
 		.join('');
@@ -121,7 +123,8 @@ export function renderDueDigest(items, baseUrl) {
 	const text = items
 		.map(
 			(i) =>
-				`${i.purchaseorder_number ?? '—'} · ${i.vendor_name ?? '—'} · due ${when(i.next_followup_at)}`,
+				`${i.purchaseorder_number ?? '—'} · ${i.vendor_name ?? '—'} · due ${when(i.next_followup_at)}` +
+				` · ${dueReason(i)}`,
 		)
 		.join('\n');
 

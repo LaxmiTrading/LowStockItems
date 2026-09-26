@@ -21,9 +21,10 @@ import {
 import { AppError, ValidationError } from '../shared/errors.mjs';
 import { queryMany, queryOne, withTransaction } from '../shared/db.mjs';
 import { requireAdministrator, requireUser } from '../shared/auth/session.mjs';
-import { PIPELINE_TONES, savePipelineStages } from '../shared/po/pipeline.mjs';
+import { cleanTone, savePipelineStages } from '../shared/po/pipeline.mjs';
 import { reconcileFollowups } from '../shared/zoho/purchaseOrders.mjs';
 import { markRemindersChanged } from '../shared/po/reminderGate.mjs';
+import { recomputeNextFollowup } from '../shared/po/reminders.mjs';
 
 /* ------------------------------------------------------------ validation */
 
@@ -34,9 +35,6 @@ const UUID_RE =
 // bad id is a named 400 rather than a Postgres constraint violation surfacing
 // as a 500.
 const PO_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
-
-// Every colour the pipeline accepts; shared with the pipeline save.
-const TONES = PIPELINE_TONES;
 
 function uuidField(body, field, { required = true } = {}) {
 	const value = body?.[field];
@@ -94,16 +92,59 @@ function instantField(body, field, { required = false } = {}) {
 	return parsed.toISOString();
 }
 
-// Mirror the CHECKs 0007 puts on po_followup_events, so a bad value is a
-// named 400 rather than a constraint violation surfacing as a 500.
-const CALL_OUTCOMES = [
+/**
+ * A bare calendar date, kept as the 'YYYY-MM-DD' string it arrived as.
+ *
+ * Deliberately not parsed into a Date and back. `<input type="date">` sends
+ * exactly this shape, the column is a bare DATE, and shared/db.mjs overrides
+ * node-postgres's DATE parser so it reads back the same way — so the value
+ * needs no conversion in either direction. Adding a `toISOString()` anywhere on
+ * this path moves every promise a day earlier for anyone east of Greenwich,
+ * which is the bug that override exists to prevent.
+ *
+ * Nor does the lost-sale validator's one-day slack belong here: that exists to
+ * allow a *future* date typed in IST, and a promised dispatch date is never
+ * compared against now. A vendor who promised last Tuesday and missed it is the
+ * ordinary case.
+ */
+function dateField(body, field) {
+	const value = body?.[field];
+	if (value === undefined || value === null || value === '') return null;
+	if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+		throw new AppError('VALIDATION', `${field} must be a date.`, 400, { field });
+	}
+	const year = Number(value.slice(0, 4));
+	if (year < 2000 || year > 2100) {
+		throw new AppError('VALIDATION', `${field} is out of range.`, 400, { field });
+	}
+	// Rejects 2026-02-31 and friends, which the regex above happily accepts.
+	const parsed = new Date(`${value}T00:00:00Z`);
+	if (Number.isNaN(parsed.getTime()) || !parsed.toISOString().startsWith(value)) {
+		throw new AppError('VALIDATION', `${field} is not a real date.`, 400, { field });
+	}
+	return value;
+}
+
+// Mirrors the CHECKs on po_followup_events, so a bad value is a named 400
+// rather than a constraint violation surfacing as a 500.
+const CALL_DIRECTIONS = ['inbound', 'outbound'];
+
+// What the vendor actually said, revived by 0009 as "Call response" on the
+// follow-up response form. Calls logged between 0007 and 0009 recorded nothing
+// here; the labels live in src/lib/poFollowups.js, so rewording one is not a
+// migration.
+const CALL_RESPONSES = [
+	'no_answer',
 	'goods_not_ready',
 	'production_delayed',
 	'dispatch_promised',
 	'dispatched',
 	'lr_awaiting',
+	'lr_sent',
 ];
-const CALL_DIRECTIONS = ['inbound', 'outbound'];
+
+// The two ways a nudge stops being open. Anything else leaves it owed.
+const RESOLUTIONS = ['resolved', 'rescheduled'];
 
 /** One of a fixed set of codes, always required. */
 function choiceField(body, field, allowed, message) {
@@ -143,11 +184,17 @@ const statusRow = (r) => ({
 	isTerminal: r.is_terminal,
 	outcome: r.outcome ?? null,
 	archived: r.archived_at !== null,
+	// "Chase if an order is still here N days after <anchor>". Null means this
+	// stage never chases on its own.
+	chaseAfterDays: r.chase_after_days ?? null,
+	chaseAnchor: r.chase_anchor ?? 'stage',
+	chaseNote: r.chase_note ?? null,
 });
 
 async function readWorkflow() {
 	const statuses = await queryMany(
-		`SELECT id, name, tone, sort_order, is_initial, is_terminal, outcome, archived_at
+		`SELECT id, name, tone, sort_order, is_initial, is_terminal, outcome, archived_at,
+		        chase_after_days, chase_anchor, chase_note
 		   FROM po_followup_statuses
 		  ORDER BY archived_at NULLS FIRST, sort_order, name`,
 	);
@@ -173,8 +220,9 @@ async function createStatus(request) {
 	const body = await readJson(request);
 
 	const name = requireString(body, 'name', { max: 60 });
-	const tone = body.tone ?? 'neutral';
-	if (!TONES.has(tone)) {
+	// Shared with the pipeline save: a palette name or a custom #rrggbb.
+	const tone = cleanTone(body.tone ?? 'neutral');
+	if (tone === null) {
 		throw new ValidationError('That is not a known tone.', { field: 'tone' });
 	}
 
@@ -226,7 +274,8 @@ async function updateStatus(request) {
 		}
 	}
 
-	if (body.tone !== undefined && !TONES.has(body.tone)) {
+	const tone = body.tone === undefined ? undefined : cleanTone(body.tone);
+	if (tone === null) {
 		throw new ValidationError('That is not a known tone.', { field: 'tone' });
 	}
 	if (
@@ -253,7 +302,7 @@ async function updateStatus(request) {
 		[
 			id,
 			name,
-			body.tone ?? null,
+			tone ?? null,
 			body.sortOrder ?? null,
 			body.isInitial === undefined ? null : body.isInitial === true,
 			body.isTerminal === undefined ? null : body.isTerminal === true,
@@ -415,8 +464,16 @@ const followupRow = (r) => ({
 	statusName: r.status_name ?? null,
 	statusTone: r.status_tone ?? null,
 	statusArchived: r.status_archived ?? false,
+	statusOutcome: r.status_outcome ?? null,
 	nextFollowupAt: r.next_followup_at,
+	// Whether the due above was typed by somebody or derived from the stage.
+	// The panel and the reminder both say what is owed, and they cannot without
+	// knowing which.
+	nextFollowupSource: r.next_followup_source ?? null,
 	notifiedAt: r.notified_at,
+	promisedDispatchDate: r.promised_dispatch_date ?? null,
+	statusSince: r.status_since ?? null,
+	chaseResolvedAt: r.chase_resolved_at ?? null,
 	lastEventAt: r.last_event_at ?? null,
 	eventCount: r.event_count ?? 0,
 	updatedAt: r.updated_at,
@@ -424,8 +481,10 @@ const followupRow = (r) => ({
 
 const FOLLOWUP_SELECT = `
 	SELECT f.purchaseorder_id, f.purchaseorder_number, f.vendor_id, f.vendor_name,
-	       f.status_id, f.next_followup_at, f.notified_at, f.updated_at,
-	       s.name AS status_name, s.tone AS status_tone,
+	       f.status_id, f.next_followup_at, f.next_followup_source, f.notified_at,
+	       f.promised_dispatch_date, f.status_since, f.chase_resolved_at,
+	       f.updated_at,
+	       s.name AS status_name, s.tone AS status_tone, s.outcome AS status_outcome,
 	       (s.archived_at IS NOT NULL) AS status_archived,
 	       e.last_event_at, e.event_count
 	  FROM po_followups f
@@ -465,6 +524,8 @@ const eventRow = (r) => ({
 	toStatusId: r.to_status_id,
 	toStatusName: r.to_status_name,
 	forced: r.forced,
+	// On a response: whether the nudge was closed or a new date was set.
+	resolution: r.resolution ?? null,
 	createdById: r.created_by,
 	createdByName: r.created_by_name,
 	createdAt: r.created_at,
@@ -609,55 +670,33 @@ async function checkTransition(run, currentStatusId, targetStatusId, actor, forc
 }
 
 /**
- * Point the order at its soonest pending reminder.
+ * The fields a call and a response have in common.
  *
- * Denormalised onto the parent so the reminder sweep is one indexed read. The
- * notified_at reset is what lets a rescheduled follow-up fire again: without
- * it, moving a reminder forward would leave it already marked as sent.
+ * Direction is required on a call and absent from a response: the response form
+ * does not ask, because answering a nudge is always us ringing them, and
+ * recording a guess as though somebody had said it is worse than recording
+ * nothing. The timeline already omits the badge when it is null.
  */
-async function recomputeNextFollowup(run, followupId) {
-	await run(
-		`UPDATE po_followups f
-		    SET next_followup_at = e.next_followup_at,
-		        next_followup_event_id = e.id,
-		        notified_at = CASE
-		          WHEN e.next_followup_at IS DISTINCT FROM f.next_followup_at
-		          THEN NULL ELSE f.notified_at END
-		   FROM (
-		     SELECT id, next_followup_at FROM po_followup_events
-		      WHERE followup_id = $1 AND needs_followup
-		      ORDER BY next_followup_at ASC LIMIT 1
-		   ) e
-		  WHERE f.id = $1`,
-		[followupId],
-	);
-
-	// The subquery above yields no row when nothing is pending, and an UPDATE
-	// ... FROM with no matching row updates nothing — so clearing is separate.
-	await run(
-		`UPDATE po_followups
-		    SET next_followup_at = NULL, next_followup_event_id = NULL
-		  WHERE id = $1
-		    AND NOT EXISTS (
-		      SELECT 1 FROM po_followup_events
-		       WHERE followup_id = $1 AND needs_followup
-		    )`,
-		[followupId],
-	);
-}
-
-async function readEventFields(body) {
+async function readEventFields(body, { requireDirection = true } = {}) {
 	const needsFollowup = body.needsFollowup === true;
+	const hasDirection =
+		body.direction !== undefined && body.direction !== null && body.direction !== '';
 	return {
 		occurredAt: instantField(body, 'occurredAt', { required: true }),
-		outcome: choiceField(body, 'outcome', CALL_OUTCOMES, 'Pick the outcome of the call.'),
-		direction: choiceField(
-			body,
-			'direction',
-			CALL_DIRECTIONS,
-			'Say whether this was an inbound or an outbound call.',
-		),
+		direction:
+			requireDirection || hasDirection
+				? choiceField(
+						body,
+						'direction',
+						CALL_DIRECTIONS,
+						'Say whether this was an inbound or an outbound call.',
+					)
+				: null,
 		details: optionalText(body, 'details', 4000),
+		// Unconditional, unlike the reminder below: there is no toggle in front
+		// of it, so an empty field means "no date recorded" on a new call and
+		// "clear the one that was" on an edit.
+		promisedDispatchDate: dateField(body, 'promisedDispatchDate'),
 		needsFollowup,
 		// Forced null when the toggle is off: the form hides the field rather
 		// than clearing it, so a stale value would otherwise be saved.
@@ -715,17 +754,17 @@ async function logCall(request) {
 		const event = (
 			await run(
 				`INSERT INTO po_followup_events
-				   (followup_id, kind, occurred_at, outcome, direction, details,
-				    needs_followup, next_followup_at,
+				   (followup_id, kind, occurred_at, direction, details,
+				    promised_dispatch_date, needs_followup, next_followup_at,
 				    from_status_id, to_status_id, forced, created_by)
 				 VALUES ($1, 'call', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 				 RETURNING id`,
 				[
 					followup.id,
 					fields.occurredAt,
-					fields.outcome,
 					fields.direction,
 					fields.details,
+					fields.promisedDispatchDate,
 					fields.needsFollowup,
 					fields.nextFollowupAt,
 					moving ? followup.status_id : null,
@@ -738,9 +777,21 @@ async function logCall(request) {
 
 		if (moving) {
 			await run(
-				`UPDATE po_followups SET status_id = $2, updated_by = $3, updated_at = NOW()
+				`UPDATE po_followups
+				    SET status_id = $2, status_since = NOW(),
+				        -- A move is movement, so whatever was resolved about the
+				        -- old stage says nothing about this one.
+				        chase_resolved_at = NULL,
+				        updated_by = $3, updated_at = NOW()
 				  WHERE id = $1`,
 				[followup.id, targetStatusId, actor.id],
+			);
+		} else if (fields.promisedDispatchDate !== null) {
+			// A fresh promise re-opens the chase even with no move: the vendor has
+			// given a new date, so "nothing more to chase" no longer holds.
+			await run(
+				`UPDATE po_followups SET chase_resolved_at = NULL WHERE id = $1`,
+				[followup.id],
 			);
 		}
 
@@ -760,13 +811,21 @@ async function logCall(request) {
 	);
 }
 
-/** A status move on its own, with no call behind it. */
+/**
+ * A status move on its own, with no call behind it.
+ *
+ * This gates the reminder sweep and recomputes, which it did not have to before
+ * 0009: a stage can now chase on its own, so moving one is a reminder write like
+ * any other. Without the gate a move would leave the sweep asleep, holding a
+ * "next due" record that no longer describes anything.
+ */
 async function setStatus(request) {
 	const actor = await requireUser(request);
 	const body = await readJson(request);
 	body.purchaseorderId = purchaseOrderId(body);
 	const targetStatusId = uuidField(body, 'statusId');
 
+	await markRemindersChanged();
 	await withTransaction(async (run) => {
 		const followup = await upsertFollowup(run, body, actor.id);
 
@@ -798,11 +857,16 @@ async function setStatus(request) {
 		);
 
 		await run(
-			`UPDATE po_followups SET status_id = $2, updated_by = $3, updated_at = NOW()
+			`UPDATE po_followups
+			    SET status_id = $2, status_since = NOW(), chase_resolved_at = NULL,
+			        updated_by = $3, updated_at = NOW()
 			  WHERE id = $1`,
 			[followup.id, targetStatusId, actor.id],
 		);
+
+		await recomputeNextFollowup(run, followup.id);
 	});
+	await markRemindersChanged();
 
 	const fresh = await queryOne(
 		`${FOLLOWUP_SELECT} WHERE f.purchaseorder_id = $1`,
@@ -824,30 +888,39 @@ async function updateCall(request) {
 		[eventId],
 	);
 	if (!existing) throw new AppError('NOT_FOUND', 'No such call.', 404);
-	if (existing.kind !== 'call') {
+	// A response is editable too — a note typed in a hurry while the vendor was
+	// still on the line is exactly the thing that needs correcting. A status
+	// move is not: it happened, and rewriting history is not the same as
+	// correcting a record of it.
+	if (existing.kind !== 'call' && existing.kind !== 'response') {
 		throw new ValidationError('Only a logged call can be edited.');
 	}
 	assertMayEdit(existing, actor);
 
-	const fields = await readEventFields(body);
+	const fields = await readEventFields(body, {
+		requireDirection: existing.kind === 'call',
+	});
 	assertReminderInFuture(fields);
 
 	await markRemindersChanged();
 	await withTransaction(async (run) => {
-		// The conclusion and promised dates of a call logged before 0007 are
-		// left as they were: the form no longer shows them, so it cannot be
+		// The promised dispatch date is editable again — the form shows it, so
+		// correcting a date heard wrong over the phone has to be possible. The
+		// outcome, conclusion and promised *ready* date of an earlier call are
+		// still left alone: the form does not show those, so it cannot be
 		// allowed to wipe them.
 		await run(
 			`UPDATE po_followup_events
-			    SET occurred_at = $2, outcome = $3, direction = $4, details = $5,
+			    SET occurred_at = $2, direction = $3, details = $4,
+			        promised_dispatch_date = $5,
 			        needs_followup = $6, next_followup_at = $7
 			  WHERE id = $1`,
 			[
 				eventId,
 				fields.occurredAt,
-				fields.outcome,
 				fields.direction,
 				fields.details,
+				fields.promisedDispatchDate,
 				fields.needsFollowup,
 				fields.nextFollowupAt,
 			],
@@ -892,6 +965,125 @@ async function deleteCall(request) {
 		[existing.purchaseorder_id],
 	);
 	return jsonSuccess({ deleted: true, followup: followupRow(fresh) }, request);
+}
+
+/**
+ * Answer an open nudge.
+ *
+ * A reminder here is a task with two exits rather than an alarm that rings once
+ * and is gone. The vendor said something — that is `outcome`, and a promised
+ * date if they gave one — and then either there is nothing more to chase until
+ * something changes (`resolved`) or there is a new date to chase it on
+ * (`rescheduled`).
+ *
+ * `chase_resolved_at` is what either exit sets, and it is what stops the stage
+ * nudging again the moment the sweep next runs: the stage's own answer to "how
+ * long has this sat here" has not changed just because somebody dealt with it.
+ * Any real movement — a stage change, a fresh promise — clears it again.
+ */
+async function respond(request) {
+	const actor = await requireUser(request);
+	const body = await readJson(request);
+	body.purchaseorderId = purchaseOrderId(body);
+
+	const outcome = choiceField(
+		body,
+		'outcome',
+		CALL_RESPONSES,
+		'Say what the vendor told you.',
+	);
+	const resolution = choiceField(
+		body,
+		'resolution',
+		RESOLUTIONS,
+		'Say whether this is settled or needs chasing again.',
+	);
+	const rescheduling = resolution === 'rescheduled';
+
+	const promisedDispatchDate = dateField(body, 'promisedDispatchDate');
+	const details = optionalText(body, 'details', 4000);
+	const nextFollowupAt = rescheduling
+		? instantField(body, 'nextFollowupAt', { required: true })
+		: null;
+	assertReminderInFuture({ nextFollowupAt });
+
+	const targetStatusId = uuidField(body, 'statusId', { required: false });
+
+	await markRemindersChanged();
+	const result = await withTransaction(async (run) => {
+		const followup = await upsertFollowup(run, body, actor.id);
+
+		const moving =
+			targetStatusId !== null && targetStatusId !== followup.status_id;
+
+		let forced = false;
+		if (moving) {
+			forced = await checkTransition(
+				run,
+				followup.status_id,
+				targetStatusId,
+				actor,
+				body.force === true,
+			);
+		}
+
+		const event = (
+			await run(
+				`INSERT INTO po_followup_events
+				   (followup_id, kind, occurred_at, outcome, details,
+				    promised_dispatch_date, resolution,
+				    needs_followup, next_followup_at,
+				    from_status_id, to_status_id, forced, created_by)
+				 VALUES ($1, 'response', NOW(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+				 RETURNING id`,
+				[
+					followup.id,
+					outcome,
+					details,
+					promisedDispatchDate,
+					resolution,
+					rescheduling,
+					nextFollowupAt,
+					moving ? followup.status_id : null,
+					moving ? targetStatusId : null,
+					forced,
+					actor.id,
+				],
+			)
+		).rows[0];
+
+		// Answering mutes the stage's nudge — including when a new date was
+		// chosen, because that date is the one that should fire and the stage's
+		// would otherwise sit beside it nagging about the same thing.
+		//
+		// Unless the answer moved the order. A new stage is new business with a
+		// clock of its own: replying "they have dispatched it" and moving it to
+		// Dispatched is precisely what should start the count towards "and still
+		// nothing has arrived". So a move clears the flag rather than setting it.
+		await run(
+			`UPDATE po_followups
+			    SET status_id = COALESCE($2, status_id),
+			        status_since = CASE WHEN $2 IS NULL THEN status_since ELSE NOW() END,
+			        chase_resolved_at = CASE WHEN $2 IS NULL THEN NOW() ELSE NULL END,
+			        updated_by = $3, updated_at = NOW()
+			  WHERE id = $1`,
+			[followup.id, moving ? targetStatusId : null, actor.id],
+		);
+
+		await recomputeNextFollowup(run, followup.id);
+		return { eventId: event.id };
+	});
+	await markRemindersChanged();
+
+	const fresh = await queryOne(
+		`${FOLLOWUP_SELECT} WHERE f.purchaseorder_id = $1`,
+		[body.purchaseorderId],
+	);
+	return jsonSuccess(
+		{ followup: followupRow(fresh), eventId: result.eventId },
+		request,
+		{ status: 201 },
+	);
 }
 
 // The timeline is a record of what happened, so it is not a free-for-all: the
@@ -956,7 +1148,12 @@ async function unregisterDevice(request) {
 async function savePipeline(request) {
 	await requireAdministrator(request);
 	const body = await readJson(request);
+	// Gated like any other reminder write: chase days are configuration, and
+	// saving them re-dates every order already sitting in a stage whose count
+	// changed.
+	await markRemindersChanged();
 	const summary = await savePipelineStages(body.stages);
+	await markRemindersChanged();
 	return jsonSuccess({ ...(await readWorkflow()), ...summary }, request);
 }
 
@@ -987,6 +1184,7 @@ const routes = [
 	{ method: 'GET', pattern: '/api/po/followups/detail', handler: followupDetail },
 	{ method: 'POST', pattern: '/api/po/followups/status', handler: setStatus },
 	{ method: 'POST', pattern: '/api/po/followups/calls', handler: logCall },
+	{ method: 'POST', pattern: '/api/po/followups/respond', handler: respond },
 	{ method: 'PUT', pattern: '/api/po/followups/calls', handler: updateCall },
 	{ method: 'DELETE', pattern: '/api/po/followups/calls', handler: deleteCall },
 	{ method: 'POST', pattern: '/api/po/followups/reconcile', handler: reconcile },
@@ -1012,6 +1210,7 @@ export const config = {
 		'/api/po/followups/detail',
 		'/api/po/followups/status',
 		'/api/po/followups/calls',
+		'/api/po/followups/respond',
 		'/api/po/followups/reconcile',
 		'/api/push/devices',
 	],

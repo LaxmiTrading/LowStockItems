@@ -328,6 +328,29 @@ input[type='number'] {
 	appearance: textfield;
 }
 
+/* The colour wheel's brightness slider: the track is the gradient set inline,
+   so only the thumb is drawn here — white with a dark ring, which reads over
+   both ends of any gradient. */
+.colour-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 16px;
+	height: 16px;
+	border-radius: 9999px;
+	background: #fff;
+	box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.4);
+	cursor: pointer;
+}
+.colour-slider::-moz-range-thumb {
+	width: 16px;
+	height: 16px;
+	border: none;
+	border-radius: 9999px;
+	background: #fff;
+	box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35), 0 1px 3px rgb(0 0 0 / 0.4);
+	cursor: pointer;
+}
+
 /* Tabular figures for every number in a table or total. */
 .num {
 	font-variant-numeric: tabular-nums;

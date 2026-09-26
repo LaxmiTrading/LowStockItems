@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import Field from '../Field';
 import Toggle from './Toggle';
-import { CALL_DIRECTIONS, CALL_OUTCOMES } from '../../lib/poFollowups';
+import StatusSelect from './StatusSelect';
+import { StatusPill } from './FollowUpTimeline';
+import {
+	CALL_DIRECTIONS,
+	isDateInput,
+	reachableFrom,
+	statusById,
+	toInstant,
+	toLocalInput,
+} from '../../lib/poFollowups';
 
 const field =
 	'w-full h-[38px] border border-line-2 rounded px-3 text-[13.5px] bg-surface text-body outline-none focus:border-brand transition-colors';
@@ -9,33 +18,13 @@ const field =
 const area =
 	'w-full border border-line-2 rounded px-3 py-2 text-[13.5px] bg-surface text-body outline-none focus:border-brand transition-colors resize-y min-h-[76px]';
 
-/**
- * `datetime-local` wants "YYYY-MM-DDTHH:mm" in *local* time, with no zone.
- * Building it by hand rather than from toISOString, which converts to UTC and
- * would show an Indian user a time five and a half hours off.
- */
-function toLocalInput(date) {
-	const pad = (n) => String(n).padStart(2, '0');
-	return (
-		`${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-		`T${pad(date.getHours())}:${pad(date.getMinutes())}`
-	);
-}
-
-// The inverse, and the only place a local value becomes an absolute instant.
-// `new Date('2026-09-14T11:30')` is parsed as local time, which is what was
-// meant, so toISOString then carries the right moment to the server.
-function toInstant(localValue) {
-	if (!localValue) return null;
-	const parsed = new Date(localValue);
-	return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-}
-
 const blank = () => ({
 	occurredLocal: toLocalInput(new Date()),
 	direction: 'outbound',
-	outcome: '',
 	details: '',
+	// A bare 'YYYY-MM-DD', sent exactly as typed. Unlike the two fields above it
+	// is never converted — see the note on isDateInput in lib/poFollowups.
+	promisedDispatchDate: '',
 	needsFollowup: false,
 	nextFollowupLocal: '',
 	statusId: '',
@@ -44,14 +33,26 @@ const blank = () => ({
 /**
  * Record how a vendor call went, and when to ring them again.
  *
- * The outcome is picked from a fixed list rather than written, so calls can be
- * compared across orders; anything that does not fit goes in Notes. The
- * reminder is deliberately one field: the toggle reveals "Next follow-up on"
- * and nothing else here notifies.
+ * Where the chase stands is the order's pipeline stage, so a call moves that
+ * rather than recording an outcome of its own, and moving it is optional:
+ * plenty of calls change nothing. Only the moves the pipeline allows are
+ * listed; an administrator can show every stage, and a move the pipeline would
+ * refuse is then sent as an override.
+ *
+ * The date the vendor promised is a field of its own rather than a line in the
+ * notes, because it is the fact the whole chase turns on: a stage can say the
+ * order is waiting on a dispatch, but only this says *which day* was named, and
+ * a stage configured to chase from the promise reads it to know when to nudge.
+ *
+ * Two things can put this order back in front of somebody — the stage, on its
+ * own schedule, and the toggle at the foot of this form. The toggle is the
+ * *extra* one: it exists for "ring them Thursday afternoon regardless".
  */
 export default function CallLogForm({
-	reachable,
-	currentStatusName,
+	workflow,
+	currentStatusId,
+	canMoveStatus,
+	isAdmin,
 	initial,
 	busy,
 	onSubmit,
@@ -70,6 +71,17 @@ export default function CallLogForm({
 
 	const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
+	const reachable = useMemo(
+		() => (canMoveStatus ? reachableFrom(workflow, currentStatusId) : []),
+		[canMoveStatus, workflow, currentStatusId],
+	);
+
+	// An administrator sees the field even when the pipeline allows no move
+	// from here, because the override is how they get past that.
+	const showStatus = canMoveStatus && (reachable.length > 0 || isAdmin);
+
+	const current = statusById(workflow, currentStatusId);
+
 	const minNext = useMemo(() => toLocalInput(new Date()), []);
 
 	// Mirrors the server's rules, so the common mistakes are caught without a
@@ -87,8 +99,11 @@ export default function CallLogForm({
 			next.direction = 'Was this call inbound or outbound?';
 		}
 
-		if (!form.outcome) {
-			next.outcome = 'Pick the outcome of the call.';
+		// Shape only. A promise for a day already gone is the ordinary case —
+		// that is precisely the vendor who needs chasing — so there is no
+		// past/future rule here or on the server.
+		if (form.promisedDispatchDate && !isDateInput(form.promisedDispatchDate)) {
+			next.promisedDispatchDate = 'That is not a valid date.';
 		}
 
 		if (form.needsFollowup) {
@@ -111,8 +126,10 @@ export default function CallLogForm({
 		onSubmit({
 			occurredAt: toInstant(form.occurredLocal),
 			direction: form.direction,
-			outcome: form.outcome,
 			details: form.details.trim() || null,
+			// Sent verbatim: the input already produces exactly what the column
+			// holds, and any conversion here loses a day going east.
+			promisedDispatchDate: form.promisedDispatchDate || null,
 			needsFollowup: form.needsFollowup,
 			// Sent as null when the toggle is off, so a value typed and then
 			// toggled away never becomes a reminder.
@@ -120,6 +137,11 @@ export default function CallLogForm({
 				? toInstant(form.nextFollowupLocal)
 				: null,
 			statusId: form.statusId || null,
+			// Forced only when the pipeline would refuse the move, so a stage that
+			// was reachable anyway is not recorded as an override just because
+			// the box happened to be ticked.
+			force:
+				!!form.statusId && !reachable.some((s) => s.id === form.statusId),
 		});
 	};
 
@@ -154,20 +176,43 @@ export default function CallLogForm({
 				</div>
 			</Field>
 
-			<Field label="Outcome" required error={errors.outcome}>
-				<select
-					value={form.outcome}
-					onChange={(e) => set({ outcome: e.target.value })}
-					className={field}>
-					<option value="" disabled>
-						Select an outcome
-					</option>
-					{CALL_OUTCOMES.map((o) => (
-						<option key={o.value} value={o.value}>
-							{o.label}
-						</option>
-					))}
-				</select>
+			{showStatus && (
+				<Field label="Status">
+					<StatusSelect
+						workflow={workflow}
+						currentStatusId={currentStatusId}
+						isAdmin={isAdmin}
+						value={form.statusId}
+						onChange={(statusId) => set({ statusId })}
+						disabled={busy}
+					/>
+					{/* Written here rather than as Field's hint, which is text only
+					    and could not show the current stage's colour. */}
+					<div className="flex items-center gap-1.5 flex-wrap text-[11px] text-muted mt-1.5">
+						{current ? (
+							<>
+								Currently
+								<StatusPill name={current.name} tone={current.tone} archived={current.archived} />
+							</>
+						) : (
+							'This order has no status yet.'
+						)}
+					</div>
+				</Field>
+			)}
+
+			<Field
+				label="Dispatch promised"
+				error={errors.promisedDispatchDate}
+				hint="The date the vendor gave. Leave empty if they would not commit to one.">
+				{/* No `min`. A vendor who promised last Tuesday and missed it is
+				    exactly the one this form is being filled in about. */}
+				<input
+					type="date"
+					value={form.promisedDispatchDate}
+					onChange={(e) => set({ promisedDispatchDate: e.target.value })}
+					className={field}
+				/>
 			</Field>
 
 			<Field label="Notes" align="start">
@@ -179,30 +224,8 @@ export default function CallLogForm({
 				/>
 			</Field>
 
-			{reachable.length > 0 && (
-				<Field
-					label="Move status to"
-					hint={
-						currentStatusName
-							? `Currently "${currentStatusName}". Only the moves your flow allows are listed.`
-							: 'Only the statuses an order can start at are listed.'
-					}>
-					<select
-						value={form.statusId}
-						onChange={(e) => set({ statusId: e.target.value })}
-						className={field}>
-						<option value="">Leave unchanged</option>
-						{reachable.map((s) => (
-							<option key={s.id} value={s.id}>
-								{s.name}
-							</option>
-						))}
-					</select>
-				</Field>
-			)}
-
-			{/* The one field that creates a reminder. */}
-			<Field label="Follow up again">
+			{/* An extra reminder, on top of whatever the stage already chases for. */}
+			<Field label="Remind me as well">
 				<div className="flex items-center gap-2.5">
 					<Toggle
 						on={form.needsFollowup}
@@ -219,7 +242,7 @@ export default function CallLogForm({
 						}
 					/>
 					<span className="text-[13px] text-body-3">
-						This order needs another call
+						Remind me at a time I choose
 					</span>
 				</div>
 			</Field>
@@ -230,7 +253,7 @@ export default function CallLogForm({
 						label="Next follow-up on"
 						required
 						error={errors.nextFollowupLocal}
-						hint="You will be reminded at this time.">
+						hint="You will be reminded at this time, whichever stage the order is in.">
 						<input
 							type="datetime-local"
 							min={minNext}
@@ -260,5 +283,3 @@ export default function CallLogForm({
 		</form>
 	);
 }
-
-export { toLocalInput };

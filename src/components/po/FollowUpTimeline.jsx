@@ -1,5 +1,9 @@
-import { directionLabel, outcomeLabel } from '../../lib/poFollowups';
-import { toneDot } from '../../lib/tones';
+import {
+	directionLabel,
+	outcomeLabel,
+	resolutionLabel,
+} from '../../lib/poFollowups';
+import { toneDot, toneStyle } from '../../lib/tones';
 
 /**
  * A stage name with its colour. The pill is neutral and only the dot is
@@ -10,7 +14,7 @@ export function StatusPill({ name, tone, archived, className = '' }) {
 	return (
 		<span
 			className={`inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2 py-0.5 rounded-full border bg-surface-2 border-line text-body-2 whitespace-nowrap ${className}`}>
-			<span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${toneDot(tone)}`} />
+			<span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${toneDot(tone)}`} style={toneStyle(tone)} />
 			{name}
 			{/* A stage removed while orders still sit on it must still read as
 			    something, rather than silently going blank. */}
@@ -94,6 +98,7 @@ export default function FollowUpTimeline({
 							className={`absolute left-0 top-[5px] w-[11px] h-[11px] rounded-full border-2 border-surface ${
 								e.toStatusId ? toneDot(tone) : 'bg-muted-3'
 							}`}
+							style={e.toStatusId ? toneStyle(tone) : undefined}
 						/>
 
 						<div className="flex items-start justify-between gap-3 flex-wrap">
@@ -110,6 +115,11 @@ export default function FollowUpTimeline({
 									{e.kind === 'status_change' && (
 										<span className="text-[10px] font-bold uppercase tracking-[.04em] text-muted-2">
 											Status change
+										</span>
+									)}
+									{e.kind === 'response' && (
+										<span className="text-[10px] font-bold uppercase tracking-[.04em] text-link">
+											Follow-up response
 										</span>
 									)}
 									{e.forced && (
@@ -140,6 +150,8 @@ export default function FollowUpTimeline({
 									</div>
 								)}
 
+								{/* What the vendor said. Asked for again on a response since
+								    0009, and still shown on calls logged before 0007 retired it. */}
 								{e.outcome && (
 									<p className="text-[13px] font-bold text-body m-0 mt-1.5">
 										{outcomeLabel(e.outcome)}
@@ -160,8 +172,15 @@ export default function FollowUpTimeline({
 
 								{(e.promisedDispatchDate ||
 									e.promisedReadyDate ||
+									e.resolution ||
 									e.nextFollowupAt) && (
 									<div className="flex items-center gap-x-4 gap-y-1 mt-2 flex-wrap">
+										{e.resolution && (
+											<Meta
+												label="Outcome"
+												value={resolutionLabel(e.resolution)}
+											/>
+										)}
 										{e.promisedDispatchDate && (
 											<Meta
 												label="Dispatch promised"
@@ -190,7 +209,7 @@ export default function FollowUpTimeline({
 								</div>
 							</div>
 
-							{e.kind === 'call' && canEdit(e) && (
+							{(e.kind === 'call' || e.kind === 'response') && canEdit(e) && (
 								<div className="flex items-center gap-1.5 flex-shrink-0">
 									<button
 										onClick={() => onEdit(e)}

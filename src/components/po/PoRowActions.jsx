@@ -22,7 +22,11 @@ function Item({ icon, label, onClick, trailing, active }) {
 }
 
 /**
- * A row's "⋯" menu: View, Log call, and Change status as a submenu.
+ * A row's "⋯" menu: View, Respond, Log call, and Change status as a submenu.
+ *
+ * Respond appears only while the app is actually asking for something on this
+ * order, and sits above Log call when it does — answering the question that was
+ * put is the likelier action than writing up a call nobody prompted.
  *
  * Portalled to the body with fixed coordinates, because the table sits inside
  * a rounded container with overflow hidden — a menu drawn inside it would be
@@ -33,8 +37,10 @@ export default function PoRowActions({
 	followup,
 	isAdmin,
 	busy,
+	owed = false,
 	onView,
 	onLogCall,
+	onRespond,
 	onChangeStatus,
 }) {
 	const [open, setOpen] = useState(false);
@@ -138,6 +144,17 @@ export default function PoRowActions({
 								</>
 							}
 						/>
+						{owed && (
+							<Item
+								label="Respond"
+								active
+								onClick={() => {
+									close();
+									onRespond();
+								}}
+								icon={<path d="M20 6L9 17l-5-5" />}
+							/>
+						)}
 						<Item
 							label="Log call"
 							onClick={() => {

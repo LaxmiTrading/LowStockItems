@@ -12,7 +12,14 @@ import {
 	startLoad,
 	applyFollowup,
 } from '../lib/poRun';
-import { getWorkflow, setFollowupStatus } from '../lib/poFollowups';
+import {
+	fmtDay,
+	getWorkflow,
+	isFollowupOwed,
+	isPastDay,
+	setFollowupStatus,
+	statusById,
+} from '../lib/poFollowups';
 import { useAuth } from '../lib/auth';
 import { StatusPill } from '../components/po/FollowUpTimeline';
 import PurchaseOrderPanel, {
@@ -20,6 +27,7 @@ import PurchaseOrderPanel, {
 } from '../components/po/PurchaseOrderPanel';
 import PoRowActions from '../components/po/PoRowActions';
 import LogCallModal from '../components/po/LogCallModal';
+import RespondModal from '../components/po/RespondModal';
 import Pagination from '../components/Pagination';
 import MetricCard from '../components/MetricCard';
 import { useIsDesktop } from '../lib/useMediaQuery';
@@ -86,6 +94,7 @@ export default function PurchaseOrdersPage() {
 	const [pageSize, setPageSize] = useState(50);
 	const [workflow, setWorkflow] = useState(null);
 	const [callFor, setCallFor] = useState(null);
+	const [respondTo, setRespondTo] = useState(null);
 	const [busyId, setBusyId] = useState(null);
 	const [actionError, setActionError] = useState(null);
 	const searchRef = useRef(null);
@@ -215,8 +224,10 @@ export default function PurchaseOrdersPage() {
 			followup={fu}
 			isAdmin={isAdmin}
 			busy={busyId === o.purchaseorder_id}
+			owed={isFollowupOwed(fu)}
 			onView={() => setOpenOrder(o)}
 			onLogCall={() => setCallFor(o)}
+			onRespond={() => setRespondTo(o)}
 			onChangeStatus={(statusId, force) => changeStatus(o, statusId, force)}
 		/>
 	);
@@ -483,6 +494,12 @@ export default function PurchaseOrdersPage() {
 							const overdue = fu?.nextFollowupAt
 								? new Date(fu.nextFollowupAt).getTime() < Date.now()
 								: false;
+							// A missed promise only reads as missed while the chase is
+							// still on; once it has ended the date is just history.
+							const promiseLate =
+								!!fu?.promisedDispatchDate &&
+								isPastDay(fu.promisedDispatchDate) &&
+								!statusById(workflow, fu.statusId)?.outcome;
 							const busy = busyId === o.purchaseorder_id;
 
 							return isDesktop ? (
@@ -520,11 +537,21 @@ export default function PurchaseOrdersPage() {
 											<span className="text-[12.5px] text-muted-3">—</span>
 										)}
 									</div>
-									<div
-										className={`text-[12px] num truncate pr-3 ${
-											overdue ? 'text-danger font-bold' : 'text-muted-2'
-										}`}>
-										{fmtWhen(fu?.nextFollowupAt) || '—'}
+									<div className="min-w-0 pr-3">
+										<div
+											className={`text-[12px] num truncate ${
+												overdue ? 'text-danger font-bold' : 'text-muted-2'
+											}`}>
+											{fmtWhen(fu?.nextFollowupAt) || '—'}
+										</div>
+										{fu?.promisedDispatchDate && (
+											<div
+												className={`text-[11px] num truncate ${
+													promiseLate ? 'text-danger' : 'text-muted-3'
+												}`}>
+												promised {fmtDay(fu.promisedDispatchDate)}
+											</div>
+										)}
 									</div>
 									<div className="text-right pr-2.5 num font-bold text-heading">
 										{money(o.total)}
@@ -563,7 +590,7 @@ export default function PurchaseOrdersPage() {
 									<div className="text-[13px] text-body mt-1 truncate">
 										{o.vendor_name}
 									</div>
-									{(fu?.statusName || fu?.nextFollowupAt) && (
+									{(fu?.statusName || fu?.nextFollowupAt || fu?.promisedDispatchDate) && (
 										<div className="flex items-center gap-2 mt-1.5 flex-wrap">
 											{fu.statusName && (
 												<StatusPill
@@ -579,6 +606,14 @@ export default function PurchaseOrdersPage() {
 													}`}>
 													{overdue ? 'Due ' : 'Next '}
 													{fmtWhen(fu.nextFollowupAt)}
+												</span>
+											)}
+											{fu.promisedDispatchDate && (
+												<span
+													className={`text-[11.5px] num ${
+														promiseLate ? 'text-danger' : 'text-muted-3'
+													}`}>
+													promised {fmtDay(fu.promisedDispatchDate)}
 												</span>
 											)}
 										</div>
@@ -631,11 +666,23 @@ export default function PurchaseOrdersPage() {
 				/>
 			)}
 
+			{respondTo && (
+				<RespondModal
+					order={respondTo}
+					workflow={workflow}
+					followup={run.followups[respondTo.purchaseorder_id]}
+					isAdmin={isAdmin}
+					onClose={() => setRespondTo(null)}
+					onSaved={(fresh) => applyFollowup(respondTo.purchaseorder_id, fresh)}
+				/>
+			)}
+
 			{callFor && (
 				<LogCallModal
 					order={callFor}
 					workflow={workflow}
 					followup={run.followups[callFor.purchaseorder_id]}
+					isAdmin={isAdmin}
 					onClose={() => setCallFor(null)}
 					onSaved={(fresh) => applyFollowup(callFor.purchaseorder_id, fresh)}
 				/>

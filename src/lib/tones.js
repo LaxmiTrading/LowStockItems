@@ -1,10 +1,14 @@
 /**
  * Stage colours for the purchase-order pipeline.
  *
- * Stored as names, never hex, so the database says "teal" and this file
- * decides what teal looks like. Only the dot carries the colour: the pill
+ * Usually a name — the database says "teal" and this file decides what teal
+ * looks like. A stage can also carry a custom #rrggbb picked on the colour
+ * wheel (migration 0008). Only the dot carries the colour either way: the pill
  * around a stage name stays on the neutral surface tokens, so every stage
- * reads correctly in both themes without a dark-mode copy of twelve hues.
+ * reads in both themes.
+ *
+ * A dot needs both toneDot (the class, for a palette name) and toneStyle (the
+ * inline colour, for a custom one); each is empty for the other kind.
  *
  * Class strings are written out in full so Tailwind's compiler finds them.
  */
@@ -37,4 +41,16 @@ const BY_ID = Object.fromEntries(PALETTE.map((p) => [p.id, p]));
 
 export const resolveTone = (tone) => BY_ID[LEGACY[tone] ?? tone] ?? BY_ID.slate;
 
-export const toneDot = (tone) => resolveTone(tone).dot;
+const HEX_RE = /^#[0-9a-f]{6}$/i;
+
+export const isCustomTone = (tone) =>
+	typeof tone === 'string' && HEX_RE.test(tone);
+
+/** A palette id, or a custom colour in the lowercase form the server stores. */
+export const normaliseTone = (tone) =>
+	isCustomTone(tone) ? tone.toLowerCase() : resolveTone(tone).id;
+
+export const toneDot = (tone) => (isCustomTone(tone) ? '' : resolveTone(tone).dot);
+
+export const toneStyle = (tone) =>
+	isCustomTone(tone) ? { backgroundColor: tone } : undefined;

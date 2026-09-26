@@ -6,8 +6,10 @@ import FollowUpTab from './FollowUpTab';
 import { StatusPill } from './FollowUpTimeline';
 import StatusMenu from './StatusMenu';
 import LogCallModal from './LogCallModal';
+import RespondModal from './RespondModal';
 import ConfirmDialog from '../ConfirmDialog';
 import { usePoFollowUp } from '../../lib/usePoFollowUp';
+import { isFollowupOwed } from '../../lib/poFollowups';
 
 const money = (v) =>
 	'₹' +
@@ -59,13 +61,15 @@ export default function PurchaseOrderPanel({
 	// after the cached copy is dropped.
 	const [nonce, setNonce] = useState(0);
 	const [statusOpen, setStatusOpen] = useState(false);
-	const [callDialog, setCallDialog] = useState(null); // null | { editing }
+	const [callDialog, setCallDialog] = useState(null);
+	const [responding, setResponding] = useState(false); // null | { editing }
 	const [pendingDelete, setPendingDelete] = useState(null);
 	const statusRef = useRef(null);
 
 	const fu = usePoFollowUp(order, onFollowupChange);
 	// The list's copy stands in until the panel's own read arrives.
 	const followup = fu.followup ?? listFollowup ?? null;
+	const owed = isFollowupOwed(followup);
 
 	const close = useCallback(() => onClose(), [onClose]);
 
@@ -187,10 +191,28 @@ export default function PurchaseOrderPanel({
 							)}
 						</div>
 
+						{/* While the app is asking for something, answering it is the
+						    action — "Log call" stays for a call nobody prompted. */}
+						{owed && (
+							<button
+								onClick={() => setResponding(true)}
+								disabled={fu.loading}
+								className="h-7 px-2.5 rounded border border-brand bg-brand hover:bg-brand-600 text-white text-[12px] font-bold cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-default">
+								<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+									<path d="M20 6L9 17l-5-5" />
+								</svg>
+								Respond
+							</button>
+						)}
+
 						<button
 							onClick={() => setCallDialog({ editing: null })}
 							disabled={fu.loading}
-							className="h-7 px-2.5 rounded border border-brand bg-brand hover:bg-brand-600 text-white text-[12px] font-bold cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-default">
+							className={`h-7 px-2.5 rounded text-[12px] font-bold cursor-pointer flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-default ${
+								owed
+									? 'border border-line-2 bg-surface text-body-2 hover:bg-surface-2'
+									: 'border border-brand bg-brand hover:bg-brand-600 text-white'
+							}`}>
 							<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
 								<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
 							</svg>
@@ -292,12 +314,27 @@ export default function PurchaseOrderPanel({
 				)}
 			</div>
 
+			{responding && (
+				<RespondModal
+					order={order}
+					workflow={fu.workflow}
+					followup={followup}
+					isAdmin={fu.isAdmin}
+					onClose={() => setResponding(false)}
+					onSaved={async (fresh) => {
+						await fu.callSaved(fresh);
+						setTab('followup');
+					}}
+				/>
+			)}
+
 			{callDialog && (
 				<LogCallModal
 					order={order}
 					workflow={fu.workflow}
 					followup={followup}
 					editing={callDialog.editing}
+					isAdmin={fu.isAdmin}
 					onClose={() => setCallDialog(null)}
 					onSaved={async (fresh) => {
 						await fu.callSaved(fresh);

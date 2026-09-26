@@ -1,5 +1,5 @@
 import FollowUpTimeline, { StatusPill } from './FollowUpTimeline';
-import { statusById } from '../../lib/poFollowups';
+import { dueReason, fmtDay, isPastDay, statusById } from '../../lib/poFollowups';
 
 const fmtWhen = (iso) => {
 	if (!iso) return null;
@@ -62,6 +62,12 @@ export default function FollowUpTab({
 	const toneOf = (id) => statusById(workflow, id)?.tone ?? 'slate';
 	const dueAt = followup?.nextFollowupAt;
 	const overdue = dueAt ? new Date(dueAt).getTime() < Date.now() : false;
+	const reason = dueReason(followup, status);
+
+	// A promise the vendor has already missed, on an order still being chased.
+	// Once the chase has ended, a date that went by is just history.
+	const promise = followup?.promisedDispatchDate ?? null;
+	const promiseLate = promise ? isPastDay(promise) && !status?.outcome : false;
 
 	return (
 		<div className="h-full overflow-y-auto px-5 py-5">
@@ -85,18 +91,41 @@ export default function FollowUpTab({
 					)}
 				</div>
 
-				{dueAt && (
+				{promise && (
 					<div
 						className={`flex items-center gap-1.5 mt-3 text-[12.5px] font-bold ${
-							overdue ? 'text-danger' : 'text-link'
+							promiseLate ? 'text-danger' : 'text-body-2'
 						}`}>
 						<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-							<circle cx="12" cy="12" r="9" />
-							<path d="M12 7v5l3 2" strokeLinecap="round" />
+							<rect x="3" y="5" width="18" height="16" rx="2" />
+							<path d="M3 10h18M8 3v4M16 3v4" strokeLinecap="round" />
 						</svg>
 						<span className="num">
-							{overdue ? 'Follow-up was due' : 'Next follow-up'} {fmtWhen(dueAt)}
+							Dispatch promised {fmtDay(promise)}
+							{promiseLate && ' — missed'}
 						</span>
+					</div>
+				)}
+
+				{dueAt && (
+					<div className="mt-3">
+						<div
+							className={`flex items-center gap-1.5 text-[12.5px] font-bold ${
+								overdue ? 'text-danger' : 'text-link'
+							}`}>
+							<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+								<circle cx="12" cy="12" r="9" />
+								<path d="M12 7v5l3 2" strokeLinecap="round" />
+							</svg>
+							<span className="num">
+								{overdue ? 'Follow-up was due' : 'Next follow-up'} {fmtWhen(dueAt)}
+							</span>
+						</div>
+						{/* Why it is owed. The same sentence the push and the email
+						    carry, from the twin composer in lib/poFollowups. */}
+						{reason && (
+							<div className="text-[11.5px] text-muted mt-1 ml-[18px]">{reason}</div>
+						)}
 					</div>
 				)}
 			</div>

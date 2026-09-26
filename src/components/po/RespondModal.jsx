@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import CallLogForm from './CallLogForm';
-import { logCall, toLocalInput, updateCall } from '../../lib/poFollowups';
+import FollowUpResponseForm from './FollowUpResponseForm';
+import { dueReason, respondToFollowup, statusById } from '../../lib/poFollowups';
 
 /**
- * Logging, or correcting, a vendor call — as a dialog.
+ * Answering a nudge — as a dialog.
  *
- * A dialog rather than a form inside the panel, so it can be opened from the
- * panel header and from a row's action menu alike, and so the timeline behind
- * it stays in view while the call is being written up.
+ * A sibling of LogCallModal rather than a mode of it. They ask different
+ * questions: one writes up a call somebody decided to make, this one answers a
+ * call the app asked for, and it opens with the reason it asked so the person
+ * does not have to go and remember it.
  */
-export default function LogCallModal({
+export default function RespondModal({
 	order,
 	workflow,
 	followup,
-	editing = null,
 	isAdmin = false,
 	onClose,
 	onSaved,
@@ -39,48 +39,23 @@ export default function LogCallModal({
 	}, [onClose, saving]);
 
 	const currentStatusId = followup?.statusId ?? null;
-
-	// CallLogForm re-seeds itself whenever `initial` changes identity, so this
-	// has to be memoised: a fresh object per render would wipe what is being
-	// typed on every keystroke.
-	const initial = useMemo(
-		() =>
-			editing
-				? {
-						occurredLocal: toLocalInput(new Date(editing.occurredAt)),
-						// A call logged before direction existed is asked for it
-						// rather than given a guess.
-						direction: editing.direction ?? '',
-						details: editing.details ?? '',
-						promisedDispatchDate: editing.promisedDispatchDate ?? '',
-						needsFollowup: editing.needsFollowup,
-						nextFollowupLocal: editing.nextFollowupAt
-							? toLocalInput(new Date(editing.nextFollowupAt))
-							: '',
-						statusId: '',
-					}
-				: null,
-		[editing],
-	);
+	const reason = dueReason(followup, statusById(workflow, currentStatusId));
 
 	const submit = async (payload) => {
 		setSaving(true);
 		setError(null);
 		try {
-			const body = {
+			const data = await respondToFollowup({
 				...payload,
 				purchaseorderId: order.purchaseorder_id,
 				purchaseorderNumber: order.purchaseorder_number,
 				vendorId: order.vendor_id,
 				vendorName: order.vendor_name,
-			};
-			const data = editing
-				? await updateCall({ ...body, eventId: editing.id })
-				: await logCall(body);
+			});
 			await onSaved?.(data.followup);
 			onClose();
 		} catch (e) {
-			setError(e.message || 'Could not save the call.');
+			setError(e.message || 'Could not save the response.');
 			setSaving(false);
 		}
 	};
@@ -95,12 +70,12 @@ export default function LogCallModal({
 			<div
 				role="dialog"
 				aria-modal="true"
-				aria-label={editing ? 'Edit call' : 'Log a vendor call'}
+				aria-label="Answer this follow-up"
 				className="animate-pop-in w-[720px] max-w-full max-h-[92vh] flex flex-col bg-surface rounded shadow-float overflow-hidden">
 				<div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-line flex-shrink-0">
 					<div className="min-w-0">
 						<div className="text-[16px] font-black text-heading">
-							{editing ? 'Edit call' : 'Log a vendor call'}
+							Follow-up response
 						</div>
 						<div className="text-[12px] text-muted-2 mt-0.5 truncate">
 							<span className="num">{order.purchaseorder_number}</span> ·{' '}
@@ -119,20 +94,31 @@ export default function LogCallModal({
 				</div>
 
 				<div className="flex-1 min-h-0 overflow-y-auto px-5 py-5">
+					{/* Why the app asked. Without it the form is a quiz about a
+					    conversation the person may not have had yet. */}
+					{reason && (
+						<div className="px-4 py-3 mb-5 rounded border bg-surface-3 border-line text-[13px] text-body-2 flex items-start gap-2">
+							<svg
+								width="14" height="14" viewBox="0 0 24 24" fill="none"
+								stroke="currentColor" strokeWidth="2.2"
+								className="text-muted flex-shrink-0 mt-[2px]">
+								<circle cx="12" cy="12" r="9" />
+								<path d="M12 7v5l3 2" strokeLinecap="round" />
+							</svg>
+							{reason}
+						</div>
+					)}
+
 					{error && (
 						<div className="px-4 py-3 mb-4 rounded border bg-danger-bg border-danger-border text-danger text-[13px]">
 							{error}
 						</div>
 					)}
-					{/* Editing a call cannot move the status — that happened, or did
-					    not, when the call was logged — so it is offered only for a
-					    new one. */}
-					<CallLogForm
+
+					<FollowUpResponseForm
 						workflow={workflow}
 						currentStatusId={currentStatusId}
-						canMoveStatus={!editing}
 						isAdmin={isAdmin}
-						initial={initial}
 						busy={saving}
 						onSubmit={submit}
 						onCancel={onClose}

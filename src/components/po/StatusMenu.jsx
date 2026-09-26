@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { reachableFrom } from '../../lib/poFollowups';
-import { toneDot } from '../../lib/tones';
+import { toneDot, toneStyle } from '../../lib/tones';
 
 /**
  * The stages an order can move to from where it stands.
@@ -50,7 +50,7 @@ export default function StatusMenu({
 						disabled={busy}
 						onClick={() => onPick(s.id, override)}
 						className="w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-[13px] text-body bg-transparent border-none cursor-pointer hover:bg-surface-2 disabled:opacity-50 disabled:cursor-default">
-						<span className={`w-2 h-2 rounded-full flex-shrink-0 ${toneDot(s.tone)}`} />
+						<span className={`w-2 h-2 rounded-full flex-shrink-0 ${toneDot(s.tone)}`} style={toneStyle(s.tone)} />
 						<span className="truncate">{s.name}</span>
 					</button>
 				))

@@ -530,7 +530,8 @@ Configuration, not code, because every business chases differently.
 
 - `po_followup_statuses` — the stages: name, colour (`tone`), order,
   `is_initial` (the default), `outcome` (`won` / `lost` / NULL, with
-  `is_terminal` mirroring it), `archived_at`.
+  `is_terminal` mirroring it), `archived_at`, and the chase config
+  (`chase_after_days`, `chase_anchor`, `chase_note`) described below.
 - `po_followup_transitions` — a row permits `from -> to`. **The absence
   of a row is what forbids a move.**
 
@@ -541,17 +542,42 @@ the database to it. The default cannot also be won or lost.
 **Won and lost record how a chase ended. Reaching one deletes nothing.**
 Follow-ups are removed by §6.8 only.
 
-`tone` names a colour from a fixed palette (slate, red, orange, amber,
-yellow, green, teal, cyan, blue, indigo, violet, pink) — never hex.
-`src/lib/tones.js` decides what each looks like. Only a small dot carries
-the colour; the pill around a stage name stays on neutral surface tokens,
-so stages read correctly in both themes without a dark copy of twelve hues.
-The five role names 0004 stored (neutral, brand, ok, warn, danger) are
-still accepted and migrated to palette colours.
+`tone` is either a colour from a fixed palette (slate, red, orange, amber,
+yellow, green, teal, cyan, blue, indigo, violet, pink), which
+`src/lib/tones.js` resolves, or a custom lowercase `#rrggbb` picked on the
+colour wheel (migration 0008). Only a small dot carries the colour; the pill
+around a stage name stays on neutral surface tokens, so stages read in both
+themes whichever kind they use — a custom colour too dark or too pale for
+one theme is the editor's choice. The five role names 0004 stored (neutral,
+brand, ok, warn, danger) are still accepted and migrated to palette
+colours.
 
 The graph is checked when a move is attempted and **never** enforced
 against stored state, so rewiring the flow can never strand an order that
 is already somewhere.
+
+**A stage can chase on its own.** `chase_after_days` reads as "nudge me if an
+order is still here N days after `chase_anchor`", where the anchor is either
+`stage` (when the order entered it) or `promise` (the vendor's promised
+dispatch date, falling back to stage entry when none was recorded).
+`chase_note` is what the reminder should say, used verbatim.
+
+**The anchor is per stage, not a fallback rule.** An order that reaches
+Dispatched still carries the vendor's last promise, so "use the promise if
+there is one" would date Dispatched's nudge from a day already gone and fire
+it the moment it arrived. This is the subtlest trap in the whole mechanism.
+
+A stage carrying an `outcome` never chases — there is nothing left to chase
+for — and `po_followup_statuses_chase_sane` holds the database to that.
+NULL days means the stage never chases. `Dispatched` is therefore **not** an
+outcome stage in the shipped flow: LR awaited and Received follow it.
+
+Migration 0009 seeds the flow the chase actually has — Awaiting dispatch date
+→ Dispatch promised → Delayed → Dispatched → LR awaited → Received, plus
+Cancelled by vendor — **additively**. A pipeline anybody has edited keeps
+every row exactly as it is and only gains what it is missing; the chase
+columns are populated on stages whose names still match, because those
+columns are new and hold nothing of anybody's to overwrite.
 
 ### Editing — Customize Pipeline
 
@@ -559,6 +585,18 @@ Settings shows the stages and a **Customize Pipeline** dialog
 (`PipelineModal.jsx`): one row per stage with up/down arrows, a colour
 dot, the name, a Default toggle, trophy (won), cross (lost) and delete, an
 Add Stage button, and Cancel / Save Changes. Nothing is written until Save.
+
+The colour dot opens the twelve presets above a colour wheel
+(`ColorWheel.jsx`): hue around the rim, saturation from the centre out, a
+brightness slider and a hex field. A preset stores its name and closes the
+picker; the wheel stores a custom colour and updates the row as it moves.
+
+Each stage that is not an outcome also carries, on a second line, *Chase if
+still here after N days, counted from …* and the wording that nudge should
+use. **Saving re-dates every order already sitting in a stage whose count
+changed** — the days are configuration but the due they imply is stored, so
+without it the change would quietly take effect only on whatever got touched
+next.
 
 Save sends the whole list to `PUT /api/po/workflow/pipeline`, applied in
 one transaction by `netlify/shared/po/pipeline.mjs` in an order that never
@@ -583,35 +621,88 @@ the tab half way cannot leave the flow partly rewired.
 timeline is one chronological list and two tables would make every read a
 UNION with dummy columns.
 
-The call form asks for: `occurred_at`; **Direction** (`direction`,
-`inbound` / `outbound`, radio buttons, Outbound preselected); **Outcome**
-(`outcome`, a dropdown of Goods Not Ready, Production Delayed, Dispatch
-Promised, Dispatched, LR Awaiting); **Notes** (`details`, optional); the
-status move; and the reminder. Direction and outcome are required on every
-new or edited call. Both are stored as codes, held to their set by a CHECK
-(migration 0007); the labels live in `src/lib/poFollowups.js`.
+There are **two forms**, because there are two different acts. The call log
+writes up a call somebody decided to make. The **follow-up response**
+(§6.5.1) answers a call the app asked for.
 
-`conclusion`, `promised_dispatch_date` and `promised_ready_date` are no
-longer asked for. The columns remain: calls logged before 0007 keep and
-show them, editing such a call leaves them untouched, and a status move
-made on its own stores its note in `conclusion`.
+The call form asks for: `occurred_at`; **Direction** (`direction`,
+`inbound` / `outbound`, radio buttons, Outbound preselected); **Status**, an
+optional move to another pipeline stage; **Dispatch promised**
+(`promised_dispatch_date`, optional); **Notes** (`details`, optional); and
+the reminder. Direction is required on every new or edited call, stored
+as a code held to its set by a CHECK (migration 0007), with the labels in
+`src/lib/poFollowups.js`.
+
+**Status** defaults to *Leave unchanged* and lists only the stages the
+pipeline allows from where the order stands. An administrator also sees
+*Show every stage (override)*, as in the Change status menu; a move the
+pipeline would refuse is then sent with `force` and recorded as `forced`,
+while a stage that was reachable anyway is an ordinary move. It is offered
+only when logging a call — editing one cannot move the status after the
+fact.
+
+**Dispatch promised** is the date the vendor gave, and migration 0009
+brought it back from the columns 0007 retired. The stage says where the
+chase stands; only this says *which day was named*, and a stage anchored on
+`promise` reads it to know when to nudge. There is **no past/future rule** on
+it in either the form or the server — a vendor who promised last Tuesday and
+missed it is the ordinary case. It is editable on an existing call, so a date
+heard wrong can be corrected.
+
+`conclusion` and `promised_ready_date` are still not asked for. Those
+columns remain: earlier calls keep and show them, editing such a call leaves
+them untouched, and a status move made on its own stores its note in
+`conclusion`. `outcome` is asked for again, but only on the response form.
 
 `occurred_at` and `next_followup_at` are `TIMESTAMPTZ`.
+`promised_dispatch_date` is a bare `DATE`.
 
-**Exactly one field creates a reminder.** A toggle, "this order needs
-another call", reveals *Next follow-up on*. Nothing else on the form
-notifies.
+**Two things can create a reminder** (§6.7): a time somebody typed, and the
+stage the order is sitting in. `po_followups.next_followup_at` is the earlier
+of the two, and `next_followup_source` says which it was.
 
 The browser converts every `datetime-local` with `.toISOString()` before
 sending, so the server needs no timezone correction. **Do not copy the
 one-day slack from `_lost-sales-shared.mjs`** — that exists because those
 fields are calendar dates, and an instant does not need it.
 
-The soonest pending reminder is denormalised onto
-`po_followups.next_followup_at` and recomputed inside the same
-transaction as every event write, so the reminder sweep is one
-partial-index read. Moving the date clears `notified_at`, which is what
-lets a rescheduled follow-up fire again.
+A bare `DATE` needs the opposite care. `promised_dispatch_date` is **never
+converted in either direction**: `<input type="date">` produces
+`'YYYY-MM-DD'`, `shared/db.mjs` overrides node-postgres's DATE parser to hand
+the same string back, and a `toISOString()` anywhere on that path moves every
+promise a day earlier for anyone east of Greenwich. It gets no slack either,
+because it is never compared against now.
+
+The soonest reminder from either source is denormalised onto
+`po_followups.next_followup_at` by `recomputeNextFollowup`
+(`shared/po/reminders.mjs`), inside the same transaction as every event
+write **and every status move**, so the reminder sweep is one partial-index
+read. A tie goes to the typed one. Moving the date clears `notified_at`,
+which is what lets a rescheduled follow-up fire again.
+
+### 6.5.1 The follow-up response
+
+What answers a nudge. Offered as **Respond** — ahead of *Log call* in the
+panel header and the row menu — while `next_followup_at` is in the past. It
+opens with the sentence saying why the app asked.
+
+It asks for: **Call response** (`outcome`, required, the codes migration 0009
+widened to include `no_answer` and `lr_sent`); **Dispatch promised**, shown
+only when the response is *Dispatch promised*; **Change status**, with the
+same override rules as above; **Notes**; and, required, **Then what** —
+either *Mark this follow-up as resolved* or *Schedule a new follow-up*, the
+second revealing a *Next follow-up on*.
+
+It writes one `kind = 'response'` event carrying `resolution`. It records
+**no direction**: answering a nudge is always us ringing them, and storing a
+guess as though somebody had said it is worse than storing nothing.
+
+A nudge is therefore a task with two exits rather than an alarm. That is what
+makes it safe for an unanswered one to keep asking (§6.7):
+`chase_resolved_at` is set by either exit and mutes the stage's nudge —
+**unless the response moved the order**, because a new stage is new business
+with a clock of its own, and replying "they have dispatched it" is precisely
+what should start the count towards "and still nothing has arrived".
 
 ## 6.6 Endpoints (`netlify/functions/po-followups.mjs`)
 
@@ -627,8 +718,11 @@ in the body on a write and in the query string on a read or a delete.
 - `PUT /api/po/workflow/transitions` — replaces the graph whole.
 - `GET /api/po/followups` — every tracked order.
 - `GET /api/po/followups/detail?purchaseorderId=` — one, with its events.
-- `POST /api/po/followups/status` — a move on its own.
+- `POST /api/po/followups/status` — a move on its own. Since a stage can
+  chase, this **is** a reminder write: it stamps `status_since`, clears
+  `chase_resolved_at`, recomputes and gates the sweep like any other.
 - `POST` / `PUT` / `DELETE /api/po/followups/calls` — the call log.
+- `POST /api/po/followups/respond` — answering a nudge (§6.5.1).
 - `POST` / `DELETE /api/push/devices` — FCM registration.
 - `PUT /api/po/workflow/pipeline` — saves every stage at once (§6.4).
 - `POST /api/po/followups/reconcile` — asks the server to run §6.8;
@@ -649,6 +743,25 @@ while the duplicate teaches people to ignore the alert.
 
 Then a web push to every registered device and one **digest** email to
 every active profile. Five due orders must not be five emails.
+
+**The message says what is owed**, not merely that something is. The sentence
+comes from `dueReason` in `shared/po/dueMessage.mjs`, shared by the push and
+the email so the two cannot drift, with a twin in `src/lib/poFollowups.js`
+for the panel (CRA cannot import out of `src/`). It is **data-driven and
+never branches on a stage's name** — those are user-editable, so a stage that
+wants particular wording carries it in `chase_note`.
+
+**An unanswered stage nudge asks again the next day.** A reminder that fires
+once and is never heard from again defeats the job: chasing a vendor is
+asking repeatedly until something moves. What makes repeating safe is that
+§6.5.1 gives two explicit exits, so anything dealt with goes quiet at once.
+The sweep clears `notified_at` on stage-derived rows with no
+`chase_resolved_at` and a stamp older than `RENUDGE_INTERVAL_MS`, letting
+them rejoin the same `SKIP LOCKED` claim rather than notifying them directly.
+**Only stage nudges repeat.** "Remind me at this time" is a request for one
+reminder, and turning it into a daily one would be a different promise than
+the person made. `recordNextDue` counts the re-armable rows in its `MIN`, or
+the gate would sleep through every repeat it was meant to schedule.
 
 Push is FCM HTTP v1 with a hand-signed service-account JWT
 (`shared/push/fcm.mjs`) — no `firebase-admin`, which would be bundled
@@ -716,7 +829,21 @@ closed.
 - [ ] An illegal move is refused by the **server**, not merely hidden.
 - [ ] An administrator override is recorded as `forced` on the timeline.
 - [ ] A logged call appears in the timeline with the right local time.
-- [ ] Only *Next follow-up on* creates a reminder.
+- [ ] A reminder comes from either *Next follow-up on* or the stage's own
+      chase, and `next_followup_at` is the earlier of the two.
+- [ ] A promised dispatch date lands the nudge on that day at 10:00 IST, not
+      at 05:30, and a promise for a date already gone is accepted.
+- [ ] A stage anchored on `stage` counts from stage entry even when the order
+      still carries a promise.
+- [ ] A stage carrying an outcome never nudges.
+- [ ] Changing a stage's chase days re-dates the orders already in it,
+      without anybody logging a call.
+- [ ] Responding resolves or reschedules; resolving mutes the stage's nudge,
+      and a response that moves the order re-arms the new stage instead.
+- [ ] An unanswered stage nudge asks again a day later; a typed reminder
+      fires once.
+- [ ] Deleting the call that carried a promise clears it, and the due
+      re-derives from stage entry.
 - [ ] Editing a call moves the parent reminder and clears `notified_at`.
 - [ ] Deleting the call that set a reminder clears it.
 - [ ] A due follow-up notifies once, not on every subsequent tick.

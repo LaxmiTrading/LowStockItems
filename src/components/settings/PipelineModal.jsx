@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import ColorWheel from './ColorWheel';
 import { savePipeline } from '../../lib/poFollowups';
-import { PALETTE, resolveTone, toneDot } from '../../lib/tones';
+import { PALETTE, isCustomTone, normaliseTone, toneDot, toneStyle } from '../../lib/tones';
+import { anchoredStyle, useAnchoredPosition } from '../../lib/useAnchoredPosition';
+
+// The Tailwind 500-ish value behind each palette dot, so the wheel opens on a
+// stage's current colour rather than on white. Only a starting point: moving
+// the wheel stores a custom colour, and a preset stays a name.
+const PALETTE_HEX = {
+	slate: '#94a3b8', red: '#ef4444', orange: '#f97316', amber: '#f59e0b',
+	yellow: '#facc15', green: '#22c55e', teal: '#14b8a6', cyan: '#06b6d4',
+	blue: '#3b82f6', indigo: '#6366f1', violet: '#8b5cf6', pink: '#ec4899',
+};
+const hexFor = (tone) => PALETTE_HEX[normaliseTone(tone)] ?? PALETTE_HEX.slate;
 
 let keySeq = 0;
 const newKey = () => `new-${++keySeq}`;
@@ -20,9 +32,17 @@ function rowsFrom(workflow) {
 			key: s.id,
 			id: s.id,
 			name: s.name,
-			tone: resolveTone(s.tone).id,
+			tone: normaliseTone(s.tone),
 			isDefault,
 			outcome: isDefault ? null : (s.outcome ?? (s.isTerminal ? 'won' : null)),
+			// Held as a string so the number box can be emptied while typing.
+			// '' means this stage never chases on its own.
+			chaseAfterDays:
+				s.chaseAfterDays === null || s.chaseAfterDays === undefined
+					? ''
+					: String(s.chaseAfterDays),
+			chaseAnchor: s.chaseAnchor === 'promise' ? 'promise' : 'stage',
+			chaseNote: s.chaseNote ?? '',
 		};
 	});
 	if (!defaultTaken && rows.length > 0) {
@@ -82,6 +102,8 @@ export default function PipelineModal({ workflow, onClose, onSaved }) {
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState(null);
 	const [paletteFor, setPaletteFor] = useState(null);
+	const paletteAnchor = useRef(null);
+	const palettePop = useRef(null);
 	const focusKey = useRef(null);
 	const originalIds = useRef(rowsFrom(workflow).map((r) => r.id));
 
@@ -152,10 +174,20 @@ export default function PipelineModal({ workflow, onClose, onSaved }) {
 
 	const toggleOutcome = (key, value) =>
 		setRows((rs) =>
-			rs.map((r) =>
-				r.key === key ? { ...r, outcome: r.outcome === value ? null : value } : r,
-			),
+			rs.map((r) => {
+				if (r.key !== key) return r;
+				const outcome = r.outcome === value ? null : value;
+				// Mirrors po_followup_statuses_chase_sane: a stage that ends the
+				// chase has nothing left to chase for. Cleared here so the save is
+				// never refused for something the dialog could have prevented.
+				return outcome
+					? { ...r, outcome, chaseAfterDays: '', chaseNote: '' }
+					: { ...r, outcome };
+			}),
 		);
+
+	const setChase = (key, patch) =>
+		setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
 	const remove = (key) => {
 		setRows((rs) => {
@@ -196,6 +228,15 @@ export default function PipelineModal({ workflow, onClose, onSaved }) {
 			const lower = name.toLowerCase();
 			if (seen.has(lower)) next[r.key] = `"${name}" is already a stage.`;
 			seen.add(lower);
+
+			// Mirrors the server's rule, so a typo is caught inline rather than
+			// coming back as a banner after the round trip.
+			if (r.chaseAfterDays !== '') {
+				const days = Number(r.chaseAfterDays);
+				if (!Number.isInteger(days) || days < 0 || days > 365) {
+					next[r.key] = 'Chase after a whole number of days, 0 to 365.';
+				}
+			}
 		}
 		setErrors(next);
 		return Object.keys(next).length === 0;
@@ -213,6 +254,9 @@ export default function PipelineModal({ workflow, onClose, onSaved }) {
 					tone: r.tone,
 					isDefault: r.isDefault,
 					outcome: r.outcome,
+					chaseAfterDays: r.chaseAfterDays === '' ? null : Number(r.chaseAfterDays),
+					chaseAnchor: r.chaseAnchor,
+					chaseNote: r.chaseNote.trim() || null,
 				})),
 			);
 			onSaved(result);
@@ -225,6 +269,17 @@ export default function PipelineModal({ workflow, onClose, onSaved }) {
 	const removedCount = originalIds.current.filter(
 		(id) => !rows.some((r) => r.id === id),
 	).length;
+
+	// Portalled and placed against the swatch that opened it: with the wheel it
+	// is taller than a stage row or two, and drawn inside the list it was cut
+	// off by the dialog's scrolling body for any stage near the bottom.
+	const palettePlace = useAnchoredPosition({
+		open: paletteFor !== null,
+		anchorRef: paletteAnchor,
+		popRef: palettePop,
+		deps: [paletteFor],
+	});
+	const paletteRow = rows.find((r) => r.key === paletteFor);
 
 	const iconButton = (active, activeClasses) =>
 		`w-8 h-8 rounded flex items-center justify-center border cursor-pointer flex-shrink-0 transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
@@ -280,34 +335,16 @@ export default function PipelineModal({ workflow, onClose, onSaved }) {
 										</button>
 									</div>
 
-									<div className="relative flex-shrink-0" data-palette>
+									<div className="flex-shrink-0" data-palette>
 										<button
+											ref={paletteFor === r.key ? paletteAnchor : undefined}
 											type="button"
 											onClick={() => setPaletteFor((k) => (k === r.key ? null : r.key))}
 											aria-label={`Colour of ${r.name || 'this stage'}`}
+											aria-expanded={paletteFor === r.key}
 											className="w-7 h-7 rounded-full flex items-center justify-center bg-transparent border-none cursor-pointer hover:bg-surface-2">
-											<span className={`w-[18px] h-[18px] rounded-full ${toneDot(r.tone)}`} />
+											<span className={`w-[18px] h-[18px] rounded-full ${toneDot(r.tone)}`} style={toneStyle(r.tone)} />
 										</button>
-										{paletteFor === r.key && (
-											<div className="absolute top-8 left-0 z-20 p-2 grid grid-cols-6 gap-1 bg-surface border border-line-2 rounded shadow-pop animate-slide-down">
-												{PALETTE.map((p) => (
-													<button
-														key={p.id}
-														type="button"
-														title={p.label}
-														aria-label={p.label}
-														onClick={() => {
-															update(r.key, { tone: p.id });
-															setPaletteFor(null);
-														}}
-														className={`w-7 h-7 rounded-full flex items-center justify-center bg-transparent cursor-pointer border-2 ${
-															r.tone === p.id ? 'border-heading' : 'border-transparent hover:border-line-2'
-														}`}>
-														<span className={`w-[18px] h-[18px] rounded-full ${p.dot}`} />
-													</button>
-												))}
-											</div>
-										)}
 									</div>
 
 									<input
@@ -370,6 +407,51 @@ export default function PipelineModal({ workflow, onClose, onSaved }) {
 										{errors[r.key]}
 									</div>
 								)}
+
+								{/* The chase, on a line of its own: the row above is already
+								    eight controls wide in a 540px dialog. Hidden on a stage
+								    that ends the chase, which has nothing left to chase for. */}
+								{!r.outcome && (
+									<div className="ml-[70px] mt-2 flex flex-col gap-1.5">
+										<div className="flex items-center gap-1.5 flex-wrap text-[12px] text-body-3">
+											<span>Chase if still here after</span>
+											<input
+												type="number"
+												min={0}
+												max={365}
+												value={r.chaseAfterDays}
+												placeholder="—"
+												aria-label={`Days before chasing ${r.name || 'this stage'}`}
+												onChange={(e) =>
+													setChase(r.key, { chaseAfterDays: e.target.value })
+												}
+												className="w-[56px] h-7 rounded border border-line-2 px-2 text-[12.5px] bg-surface text-body outline-none focus:border-brand num"
+											/>
+											<span>days, counted from</span>
+											<select
+												value={r.chaseAnchor}
+												aria-label={`What those days are counted from for ${r.name || 'this stage'}`}
+												onChange={(e) =>
+													setChase(r.key, { chaseAnchor: e.target.value })
+												}
+												className="h-7 rounded border border-line-2 px-1.5 text-[12.5px] bg-surface text-body outline-none focus:border-brand cursor-pointer">
+												<option value="stage">entering this stage</option>
+												<option value="promise">the promised dispatch date</option>
+											</select>
+										</div>
+
+										{r.chaseAfterDays !== '' && (
+											<input
+												value={r.chaseNote}
+												maxLength={160}
+												placeholder="What the reminder should say (optional)"
+												aria-label={`Reminder wording for ${r.name || 'this stage'}`}
+												onChange={(e) => setChase(r.key, { chaseNote: e.target.value })}
+												className="w-full h-7 rounded border border-line-2 px-2 text-[12px] bg-surface text-body outline-none focus:border-brand"
+											/>
+										)}
+									</div>
+								)}
 							</li>
 						))}
 					</ol>
@@ -417,6 +499,51 @@ export default function PipelineModal({ workflow, onClose, onSaved }) {
 					</div>
 				</div>
 			</div>
+
+			{paletteRow &&
+				createPortal(
+					<div
+						ref={palettePop}
+						data-palette
+						style={anchoredStyle(palettePlace)}
+						className="z-[110] p-3 overflow-y-auto bg-surface border border-line-2 rounded shadow-pop animate-fade-in">
+						<div className="text-[10.5px] font-black text-muted-3 tracking-[.08em] mb-1.5">PRESETS</div>
+						<div className="grid grid-cols-6 gap-1">
+							{PALETTE.map((p) => (
+								<button
+									key={p.id}
+									type="button"
+									title={p.label}
+									aria-label={p.label}
+									onClick={() => {
+										update(paletteRow.key, { tone: p.id });
+										setPaletteFor(null);
+									}}
+									className={`w-7 h-7 rounded-full flex items-center justify-center bg-transparent cursor-pointer border-2 ${
+										paletteRow.tone === p.id ? 'border-heading' : 'border-transparent hover:border-line-2'
+									}`}>
+									<span className={`w-[18px] h-[18px] rounded-full ${p.dot}`} />
+								</button>
+							))}
+						</div>
+
+						<div className="flex items-center justify-between mt-3 mb-2 pt-3 border-t border-line-4">
+							<span className="text-[10.5px] font-black text-muted-3 tracking-[.08em]">CUSTOM</span>
+							{isCustomTone(paletteRow.tone) && (
+								<span className="text-[10.5px] font-bold text-brand">In use</span>
+							)}
+						</div>
+						{/* Changes the stage live while dragging; the popover stays open
+						    until a click outside or Escape, since a wheel is adjusted
+						    rather than clicked once. */}
+						<ColorWheel
+							key={paletteRow.key}
+							value={isCustomTone(paletteRow.tone) ? paletteRow.tone : hexFor(paletteRow.tone)}
+							onChange={(hex) => update(paletteRow.key, { tone: hex })}
+						/>
+					</div>,
+					document.body,
+				)}
 		</div>,
 		document.body,
 	);

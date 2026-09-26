@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, Notice } from './primitives';
 import { getWorkflow, replaceTransitions } from '../../lib/poFollowups';
-import { toneDot } from '../../lib/tones';
+import { toneDot, toneStyle } from '../../lib/tones';
 import Checkbox from '../Checkbox';
 import PipelineModal from './PipelineModal';
 
@@ -145,7 +145,7 @@ export default function StatusWorkflowCard({ isAdmin }) {
 	return (
 		<Card
 			title="Purchase-order pipeline"
-			hint="The stages a purchase order moves through while you chase the vendor. Every order starts at the default stage; won and lost stages record how the chase ended. Reaching one deletes nothing — a follow-up is only removed once its order is no longer open in Zoho.">
+			hint="The stages a purchase order moves through while you chase the vendor. Every order starts at the default stage; won and lost stages record how the chase ended. Reaching one deletes nothing — a follow-up is only removed once its order is no longer open in Zoho. A stage can also chase on its own, reminding you when an order has sat in it too long.">
 			<Notice tone="ok">{notice}</Notice>
 			<Notice tone="error">{error}</Notice>
 
@@ -175,8 +175,18 @@ export default function StatusWorkflowCard({ isAdmin }) {
 						key={s.id}
 						className="flex items-center gap-2.5 px-3 py-2.5 border-b border-line-4 last:border-b-0">
 						<span className="text-[11px] text-muted-3 num w-4 text-right">{i + 1}</span>
-						<span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${toneDot(s.tone)}`} />
-						<span className="text-[13px] text-body flex-1 min-w-0 truncate">{s.name}</span>
+						<span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${toneDot(s.tone)}`} style={toneStyle(s.tone)} />
+							<span className="text-[13px] text-body flex-1 min-w-0 truncate">
+							{s.name}
+							{/* So the automatic chasing is visible without opening the
+							    dialog that configures it. */}
+							{s.chaseAfterDays !== null && s.chaseAfterDays !== undefined && (
+								<span className="text-[11px] text-muted-3 ml-2">
+									chases after {s.chaseAfterDays}d
+									{s.chaseAnchor === 'promise' ? ' from the promise' : ''}
+								</span>
+							)}
+						</span>
 						{s.isInitial && (
 							<span className="text-[10.5px] font-bold px-1.5 py-0.5 rounded border bg-brand-bg text-link border-brand-border">
 								Default
@@ -220,7 +230,7 @@ export default function StatusWorkflowCard({ isAdmin }) {
 										key={to.id}
 										className="bg-surface-2 border-b border-line px-2 py-2 text-[11px] font-bold text-body-3 whitespace-nowrap">
 										<span className="inline-flex items-center gap-1.5">
-											<span className={`w-1.5 h-1.5 rounded-full ${toneDot(to.tone)}`} />
+											<span className={`w-1.5 h-1.5 rounded-full ${toneDot(to.tone)}`} style={toneStyle(to.tone)} />
 											{to.name}
 										</span>
 									</th>
@@ -232,7 +242,7 @@ export default function StatusWorkflowCard({ isAdmin }) {
 								<tr key={from.id}>
 									<th className="sticky left-0 bg-surface border-b border-r border-line px-3 py-2 text-left text-[11.5px] font-bold text-body-2 whitespace-nowrap">
 										<span className="inline-flex items-center gap-1.5">
-											<span className={`w-1.5 h-1.5 rounded-full ${toneDot(from.tone)}`} />
+											<span className={`w-1.5 h-1.5 rounded-full ${toneDot(from.tone)}`} style={toneStyle(from.tone)} />
 											{from.name}
 										</span>
 									</th>
@@ -290,7 +300,7 @@ export default function StatusWorkflowCard({ isAdmin }) {
 							<span
 								key={s.id}
 								className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-2 py-0.5 rounded-full border bg-surface-2 border-line text-muted">
-								<span className={`w-1.5 h-1.5 rounded-full ${toneDot(s.tone)}`} />
+								<span className={`w-1.5 h-1.5 rounded-full ${toneDot(s.tone)}`} style={toneStyle(s.tone)} />
 								{s.name}
 							</span>
 						))}
